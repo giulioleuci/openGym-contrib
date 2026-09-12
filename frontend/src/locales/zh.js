@@ -1269,4 +1269,6 @@ export default {
   'Pass complete': '本轮已完成',
   'Next pass starts {0}': '下一轮从 {0} 开始',
 
+  'Add routine': '添加训练日',
+
 }

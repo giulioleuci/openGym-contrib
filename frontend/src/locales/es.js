@@ -1269,4 +1269,6 @@ export default {
   'Pass complete': 'Pasada completada',
   'Next pass starts {0}': 'La próxima pasada empieza {0}',
 
+  'Add routine': 'Añadir rutina',
+
 }

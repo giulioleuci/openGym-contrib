@@ -1272,4 +1272,6 @@ export default {
   'Pass complete': 'Menet kész',
   'Next pass starts {0}': 'A következő menet {0}-kor kezdődik',
 
+  'Add routine': 'Rutin hozzáadása',
+
 }

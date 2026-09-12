@@ -1269,4 +1269,6 @@ export default {
   'Pass complete': 'पास पूरा हुआ',
   'Next pass starts {0}': 'अगला पास {0} से शुरू होगा',
 
+  'Add routine': 'रूटीन जोड़ें',
+
 }

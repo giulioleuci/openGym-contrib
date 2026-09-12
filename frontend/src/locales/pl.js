@@ -1269,4 +1269,6 @@ export default {
   'Pass complete': 'Przejście ukończone',
   'Next pass starts {0}': 'Następne przejście zaczyna się {0}',
 
+  'Add routine': 'Dodaj plan treningowy',
+
 }

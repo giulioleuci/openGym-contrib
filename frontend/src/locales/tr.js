@@ -1269,4 +1269,6 @@ export default {
   'Pass complete': 'Tur tamamlandı',
   'Next pass starts {0}': 'Sıradaki tur {0} tarihinde başlıyor',
 
+  'Add routine': 'Rutin ekle',
+
 }

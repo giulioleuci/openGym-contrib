@@ -1280,4 +1280,6 @@ export default {
   'Pass complete': 'รอบเสร็จสมบูรณ์',
   'Next pass starts {0}': 'รอบถัดไปเริ่ม {0}',
 
+  'Add routine': 'เพิ่มรูทีน',
+
 }
