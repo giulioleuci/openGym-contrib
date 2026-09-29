@@ -56,6 +56,7 @@ export function buildSessionExposures(profile, routine, ctx) {
       prescriptionId: prescription.id,
       ...(occ.sg ? { sg: occ.sg } : {}),
       ...(occ.side ? { side: true } : {}),
+      ...(occ.warmupRestSec > 0 ? { warmupRestSec: occ.warmupRestSec } : {}),
       ...(occ.bodyweight != null ? { bodyweight: occ.bodyweight } : {}),
       ...(occ.intensifier && supports(occ.rule)[occ.intensifier.type] ? { intensifier: occ.intensifier } : {}),
       performance: { sets: [] }

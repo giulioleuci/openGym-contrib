@@ -64,7 +64,7 @@ export function entriesForExposures(exposures, prescriptions) {
       ...(exposure.routineId ? { rid: exposure.routineId } : {}),
       ...(exposure.excludedFromProgression ? { noProg: true } : {}),
       ...(exposure.sg ? { sg: exposure.sg } : {}),
-      target: { ...targetFor(p), ...(exposure.side ? { side: true } : {}), ...(exposure.bodyweight != null ? { bodyweight: exposure.bodyweight } : {}), ...(exposure.intensifier ? { intensifier: exposure.intensifier } : {}) },
+      target: { ...targetFor(p), ...(exposure.side ? { side: true } : {}), ...(exposure.warmupRestSec > 0 ? { warmupRestSec: exposure.warmupRestSec } : {}), ...(exposure.bodyweight != null ? { bodyweight: exposure.bodyweight } : {}), ...(exposure.intensifier ? { intensifier: exposure.intensifier } : {}) },
       planned: plannedOf(p),
       ...(p.prefill.carried ? { carried: true } : {}),
       sets: [...(p.warmupRows || []).map(warmupRowFor), ...intensified(p, exposure)]

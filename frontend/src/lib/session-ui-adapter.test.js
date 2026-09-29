@@ -139,6 +139,15 @@ describe('saved rows read back as the rows that were logged', () => {
   })
 })
 
+describe('entriesForExposures warm-up rest', () => {
+  const linear = generatePrescription({ id: 'p5', now: NOW, trackId: 't5', rule: defaultPlanRule('linear', { id: 'r5', exerciseId: '0025', unit: 'kg' }) })
+  it('puts the exercise\'s own ramp rest on the target, where the rest timer reads it', () => {
+    const run = warmupRestSec => entriesForExposures([{ exposureId: 'x', exerciseId: '0025', prescriptionId: 'p5', warmupRestSec }], { p5: linear })[0].target
+    expect(run(31).warmupRestSec).toBe(31)
+    expect(run(undefined)).not.toHaveProperty('warmupRestSec')
+  })
+})
+
 describe('entriesForExposures per side', () => {
   const linear = generatePrescription({ id: 'p4', now: NOW, trackId: 't4', rule: { ...defaultPlanRule('linear', { id: 'r4', exerciseId: '0025', unit: 'kg' }), parameters: { ...defaultPlanRule('linear', { id: 'r4', exerciseId: '0025', unit: 'kg' }).parameters, reps: { min: 10, max: 10 } } } })
   it('splits every work row into limbs and says so on the target (issue #60)', () => {

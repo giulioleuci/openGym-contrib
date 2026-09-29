@@ -51,6 +51,9 @@ function uniqueIds() {
    A frozen copy on purpose, with no parity test: it reads v1 data the way the v1 app did, so it
    must not follow later changes to the frontend originals. */
 const BODYWEIGHT_EQ = new Set(['body weight', 'band', 'resistance band']);
+// Equipment that is a load in its own right (exercises.js isLoadedEq): the rest of the catalogue
+// (an ab wheel, a stability ball…) is worked in reps when nothing is loaded on it.
+const LOADED_EQ = new Set(['barbell', 'ez barbell', 'olympic barbell', 'trap bar', 'dumbbell', 'kettlebell', 'cable', 'leverage machine', 'smith machine', 'sled machine', 'weighted']);
 const exerciseOf = (ctx, id) => records(ctx.state.customEx).find(c => String(c.id) === id) || ctx.catalogue.get(id) || null;
 const modeOf = (cfg, ex) => (MODES.includes(cfg?.mode) ? cfg.mode : ex?.bp === 'cardio' ? 'cardio' : 'reps');
 const isBodyweight = (cfg, ex) => (cfg?.bodyweight != null ? !!cfg.bodyweight : BODYWEIGHT_EQ.has(ex?.eq));
@@ -71,16 +74,38 @@ function stepFor(loads, inc, unit) {
   return [...(inc > 0 ? [inc] : []), ...STEPS[unit]].find(step => loads.every(v => onGrid(v, step))) ?? 0.001;
 }
 
-/** A canonical rule from plain v1 numbers — a routine entry, or that entry with a logged target over it. */
-function ruleFrom(v, { id, routineId, exerciseId, preset, unit, mode, step, rest }) {
+// v1 progression.js MAX_BW_SETS: where a bodyweight climb stops adding sets.
+const MAX_BW_SETS = 6;
+
+/** v1's double-progression window (rep-range.js normalizeRepRange): `reps` is the top of it and
+ *  `repsMin` the bottom. `repsMax` never bounded it — it only capped a bodyweight climb — but a
+ *  plan written that way (a range with no `reps`) reads as the range it says. */
+function doubleRange(v) {
+  const stride = v.side === true ? 2 : 1;
+  const align = n => Math.max(stride, Math.ceil(n / stride) * stride);
+  const upper = align(whole(v.reps) ?? whole(v.repsMax) ?? 10);
+  const lower = align(whole(v.repsMin) ?? Math.max(1, upper - 2));
+  return lower >= upper ? { min: lower, max: lower + stride } : { min: lower, max: upper };
+}
+
+/** A canonical rule from plain v1 numbers — a routine entry, or that entry with a logged target
+ *  over it. `reps`: the exact rep window, for a logged day whose window is not the plan's. */
+function ruleFrom(v, { id, routineId, exerciseId, preset, unit, mode, step, rest, reps: window }) {
   const rule = defaultPlanRule(preset, { id, exerciseId, routineId, unit });
   const p = rule.parameters;
   const sets = whole(v.sets);
   if (sets) p.sets = fixed(sets);
   if (mode === 'reps') {
-    const lo = whole(v.repsMin), hi = whole(v.repsMax), reps = whole(v.reps);
-    if (preset === 'double' && lo && hi && lo <= hi) p.reps = { min: lo, max: hi };
+    const reps = whole(v.reps);
+    if (preset === 'double') p.reps = doubleRange(v);
     else if (reps) p.reps = fixed(reps);
+    // A bodyweight climb's ceiling (`repsMax`): reps climb to it, then a set is added, up to six.
+    const ceiling = whole(v.repsMax);
+    if (preset === 'bodyweight_ladder' && ceiling && ceiling > p.reps.min) {
+      p.reps = { min: p.reps.min, max: ceiling };
+      p.sets = { min: p.sets.min, max: Math.max(p.sets.min, MAX_BW_SETS) };
+    }
+    if (window) p.reps = window;
   } else {
     const seconds = mode === 'cardio' ? (num(v.min) > 0 ? num(v.min) * 60 : 20 * 60) : (num(v.sec) > 0 ? num(v.sec) : 30);
     Object.assign(p, { reps: fixed(1), durationSeconds: fixed(seconds) });
@@ -120,6 +145,11 @@ function noteUnsupported(d, out) {
   if (d.preset === 'manual' && typeof d.cfg.prog === 'string' && d.cfg.prog && d.cfg.prog !== 'off') out.push({ ...at, field: 'prog', value: d.cfg.prog });
 }
 
+// v1 progression.js policyFor: the exercise's own rule, else its routine's, else linear on reps. A
+// plan that never touched the Rule row still progressed, so it must not migrate as "manual"; v2
+// keeps no routine-level default, so the inherited rule is written into each occurrence here.
+const policyOf = (cfg, routine, mode) => cfg.prog || routine.prog || (mode === 'reps' ? 'linear' : 'off');
+
 function draftRoutines(state, ctx) {
   const routineId = uniqueIds();
   return records(state.routines).map((routine, i) => {
@@ -132,7 +162,7 @@ function draftRoutines(state, ctx) {
       const mode = modeOf(cfg, info);
       const d = {
         routineId: id, occurrenceId: `${id}:o${j}`, exerciseId, cfg, info, mode,
-        preset: presetForPolicy(cfg.prog, mode, isBodyweight(cfg, info)),
+        preset: presetForPolicy(policyOf(cfg, routine, mode), mode, isBodyweight(cfg, info)),
         excluded: routine.excludeFromProgression === true || cfg.excludeFromProgression === true,
         links: []
       };
@@ -150,6 +180,7 @@ const occurrenceOf = d => ({
   ...(d.cfg.sg ? { sg: d.cfg.sg } : {}),
   ...(d.cfg.note ? { note: String(d.cfg.note) } : {}),
   ...(whole(d.cfg.restSec) ? { restSec: whole(d.cfg.restSec) } : {}),
+  ...(whole(d.cfg.warmupRestSec) ? { warmupRestSec: whole(d.cfg.warmupRestSec) } : {}),
   ...(d.cfg.excludeFromProgression === true ? { excludeFromProgression: true } : {}),
   ...(d.cfg.side === true && d.mode === 'reps' ? { side: true } : {}),
   // Only where it overrides the catalogue, the way v1 wrote it.
@@ -177,10 +208,19 @@ function linkOf(w, entry, byRoutine) {
 function finalizeDraft(d, ctx) {
   const loads = [d.cfg.weight, ...d.links.map(l => l.values.weight)].map(num).filter(v => v > 0);
   d.step = stepFor(loads, num(d.cfg.inc), ctx.unit);
-  d.ruleFor = (values, step = d.step) => ruleFrom({ ...d.cfg, ...values }, {
+  // v1 climbed reps, not load, where nothing is loaded and the equipment is no load of its own.
+  if (d.preset === 'linear' && !loads.length && !LOADED_EQ.has(d.info?.eq)) d.preset = 'bodyweight_ladder';
+  d.ruleFor = (values, step = d.step, reps) => ruleFrom({ ...d.cfg, ...values }, {
     id: `rule:${d.occurrenceId}`, routineId: d.routineId, exerciseId: d.exerciseId,
-    preset: d.preset, unit: ctx.unit, mode: d.mode, step, rest: ctx.rest
+    preset: d.preset, unit: ctx.unit, mode: d.mode, step, rest: ctx.rest, reps
   });
+  // What a logged double-progression day asked for: the climb's aim (target.reps) up to the plan's
+  // top of range, so the "top of the range in every set" gate of advance.js reads it as v1 did.
+  const dayWindow = link => {
+    const aim = d.preset === 'double' && d.mode === 'reps' ? whole(link.values.reps) : null;
+    return aim ? { min: aim, max: Math.max(aim, doubleRange(d.cfg).max) } : undefined;
+  };
+  d.dayWindow = dayWindow;
   d.links = d.links.filter(link => {
     try {
       // The plan the session was built from (v1 `planned`), never the progressed target: an
@@ -191,8 +231,8 @@ function finalizeDraft(d, ctx) {
       const unedited = link.planned && samePlanV1(link.planned, v1PlannedOf(d.cfg, d.mode));
       const fingerprint = !link.planned ? null
         : unedited ? planFingerprint(d.ruleFor({}))
-        : planFingerprint(d.ruleFor({ repsMin: null, repsMax: link.planned.reps, ...link.planned }));
-      link.prescription = generatePrescription({ id: `${link.workoutId}:p${link.j}`, now: link.at, trackId: d.occurrenceId, rule: d.ruleFor(link.values), fingerprint });
+        : planFingerprint(d.ruleFor({ repsMin: null, repsMax: null, ...link.planned }));
+      link.prescription = generatePrescription({ id: `${link.workoutId}:p${link.j}`, now: link.at, trackId: d.occurrenceId, rule: d.ruleFor(link.values, d.step, dayWindow(link)), fingerprint });
       return true;
     } catch { return false; }   // a target the engine cannot express stays readable legacy history
   });
@@ -361,7 +401,7 @@ function migrateActive(active, ctx) {
     const values = targetValues(target);
     const w = num(values.weight);
     const fit = step => (w > 0 && !onGrid(w, step) ? stepFor([w], null, ctx.unit) : step);
-    const rule = d ? d.ruleFor(values, fit(d.step)) : ruleFrom(values, {
+    const rule = d ? d.ruleFor(values, fit(d.step), d.dayWindow({ values })) : ruleFrom(values, {
       id: `rule:${id}:${j}`, routineId: null, exerciseId, preset: 'manual', unit: ctx.unit,
       mode: modeOf(target, info), step: fit(STEPS[ctx.unit][0]), rest: ctx.rest
     });

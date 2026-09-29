@@ -115,6 +115,11 @@ describe('warm-up inputs', () => {
     const id = Object.keys(EXIDX).find(k => isAssisted(k))
     expect(run(occ(id, { mode: 'smart', count: 3 })).warmupRows).toBeUndefined()
   })
+  it('the occurrence\'s own ramp rest reaches its exposure, and only when it has one', () => {
+    const exposure = ex => buildSessionExposures({ workouts: [], prescriptions: {}, progression: {}, oneRepMaxes: {} }, { id: 'rt', ex: [ex] }, { now: 0, newId: s => s })[0]
+    expect(exposure({ ...occ('0025'), warmupRestSec: 31 }).warmupRestSec).toBe(31)
+    expect(exposure(occ('0025'))).not.toHaveProperty('warmupRestSec')
+  })
 })
 
 // The mid-session settings sheet edits the plan, so it opens at the plan's sets and reps and at

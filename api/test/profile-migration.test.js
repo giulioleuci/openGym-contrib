@@ -329,3 +329,69 @@ test('an unedited plan with no `sets` configured fingerprints like its live rule
   const logged = profile.prescriptions[profile.workouts[0].exposures[0].prescriptionId];
   assert.equal(logged.planFingerprint, planFingerprint(rule));
 });
+
+// ---- v1 fields the conversion must not lose (audit of the v1 data model against the output) ----
+
+test('an exercise with no rule of its own keeps the rule v1 applied: its routine\'s, else linear on reps', () => {
+  const ROLL = '0857';   // a wheel roller: no load of its own
+  const ex = [
+    { id: BENCH, sets: 3, reps: 5, weight: 60 },                        // nothing chosen: v1 read it as linear
+    { id: BENCH, sets: 3, reps: 5, weight: 60, prog: 'off' },           // an explicit "no progression" wins
+    { id: BENCH, sets: 3, reps: 5, weight: 60, prog: 'greyskull' },     // its own rule beats the routine's
+    { id: SITUP, sets: 3, sec: 45, mode: 'time' },                      // no policy applies to a hold by default
+    { id: CARDIO, sets: 1, mode: 'cardio', min: 20 }
+  ];
+  const state = v1({ routines: [{ id: 'r1', name: 'Inherit', ex }, { id: 'r2', name: 'Double', prog: 'double', ex: ex.slice(0, 4) }], workouts: [] });
+  const { profile } = migrate(state);
+  assert.deepEqual(profile.routines[0].ex.map(o => o.rule.preset), ['linear', 'manual', 'greyskull', 'manual', 'manual']);
+  // The routine's default reaches every rep exercise that set none; a hold or cardio row cannot take it.
+  assert.deepEqual(profile.routines[1].ex.map(o => o.rule.preset), ['double', 'manual', 'greyskull', 'manual']);
+  assert.deepEqual(validateCanonicalProfile(profile), { ok: true, errors: [] });
+  // Nothing the routine's default could not reach is reported as needing review.
+  assert.deepEqual(profile.migrationAudit.unsupported, []);
+
+  const roll = migrate(v1({ routines: [{ id: 'r1', name: 'Core', ex: [{ id: ROLL, sets: 3, reps: 8 }, { id: ROLL, sets: 3, reps: 8, weight: 5 }] }], workouts: [] })).profile;
+  assert.deepEqual(roll.routines[0].ex.map(o => o.rule.preset), ['bodyweight_ladder', 'linear']);
+});
+
+test('a double-progression window keeps both ends: `reps` is its top and `repsMin` its bottom', () => {
+  const ex = [
+    { id: BENCH, sets: 3, reps: 12, repsMin: 8, weight: 60, prog: 'double' },
+    { id: BENCH, sets: 3, reps: 10, weight: 60, prog: 'double' },                       // no bottom: v1 read it as two below the top
+    { id: BENCH, sets: 3, reps: 16, repsMin: 10, weight: 20, prog: 'double', side: true },
+    { id: BENCH, sets: 3, repsMin: 8, repsMax: 12, weight: 40, prog: 'double' }         // written as a range with no `reps`
+  ];
+  const { profile } = migrate(v1({ routines: [{ id: 'r1', name: 'Range', ex }], workouts: [] }));
+  assert.deepEqual(profile.routines[0].ex.map(o => o.rule.parameters.reps), [{ min: 8, max: 12 }, { min: 8, max: 10 }, { min: 10, max: 16 }, { min: 8, max: 12 }]);
+});
+
+test('a double-progression session that stopped short of the top of its range earns no load step', () => {
+  const at = reps => v1({
+    routines: [{ id: 'r1', name: 'Push', ex: [{ id: BENCH, sets: 3, reps: 12, repsMin: 8, weight: 60, prog: 'double' }] }],
+    workouts: [{
+      id: 'w1', d: '2026-01-05', start: Date.UTC(2026, 0, 5, 18), end: Date.UTC(2026, 0, 5, 19), routineIds: ['r1'], routineId: 'r1',
+      entries: [{ id: BENCH, rid: 'r1', planned: { sets: 3, reps: 12, repsMin: 8 }, target: { sets: 3, reps: 10, repsMin: 8, weight: 60, mode: 'reps' },
+        sets: [row(reps, 60), row(reps, 60), row(reps, 60)] }]
+    }]
+  });
+  const held = migrate(at(10)).profile;    // v1: hold, aim for 11
+  assert.equal(held.progression['r1:o0'].readyToIncrement, false);
+  assert.deepEqual(held.routines[0].ex[0].rule.parameters.reps, { min: 8, max: 12 });
+  assert.deepEqual(held.prescriptions[held.workouts[0].exposures[0].prescriptionId].parameters.reps, { min: 10, max: 12 });
+  assert.equal(migrate(at(12)).profile.progression['r1:o0'].readyToIncrement, true);   // v1: top in every set -> up
+});
+
+test('a bodyweight climb keeps its ceiling: reps up to it, then sets up to v1\'s six', () => {
+  const ex = [{ id: SITUP, sets: 3, reps: 10, repsMax: 20, prog: 'linear' }, { id: SITUP, sets: 3, reps: 10, prog: 'linear' }];
+  const { profile } = migrate(v1({ routines: [{ id: 'r1', name: 'Bw', ex }], workouts: [] }));
+  const [capped, open] = profile.routines[0].ex.map(o => o.rule.parameters);
+  assert.deepEqual([capped.reps, capped.sets], [{ min: 10, max: 20 }, { min: 3, max: 6 }]);
+  assert.deepEqual([open.reps, open.sets], [{ min: 10, max: 10 }, { min: 3, max: 3 }]);
+  assert.deepEqual(validateCanonicalProfile(profile), { ok: true, errors: [] });
+});
+
+test('an exercise\'s own warm-up rest is carried onto its occurrence', () => {
+  const ex = [{ id: BENCH, sets: 3, reps: 5, weight: 60, warmupSets: 2, warmupRestSec: 31 }, { id: BENCH, sets: 3, reps: 5, weight: 60 }];
+  const { profile } = migrate(v1({ routines: [{ id: 'r1', name: 'Rest', ex }], workouts: [] }));
+  assert.deepEqual(profile.routines[0].ex.map(o => o.warmupRestSec), [31, undefined]);
+});
