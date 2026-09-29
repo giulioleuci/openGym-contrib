@@ -1817,5 +1817,6 @@ export default {
   'Back off to (%)': 'خفّض إلى (%)',
   'after {0} · to {1}%': 'بعد {0} · إلى {1}%',
   'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'بعد هذا العدد من الجلسات دون الخطة بالحمل نفسه، ينخفض الحمل ثم يرتفع من جديد.',
-  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'تم خفض الحمل بعد {0} جلسات دون الخطة: {1} → {2} {3}.'
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'تم خفض الحمل بعد {0} جلسات دون الخطة: {1} → {2} {3}.',
+  'Reduce assistance by': 'قلّل المساعدة بمقدار'
 }

@@ -1780,5 +1780,6 @@ export default {
   'Back off to (%)': 'Alléger à (%)',
   'after {0} · to {1}%': 'après {0} · à {1} %',
   'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'Après ce nombre de séances sous le plan à la même charge, la charge redescend puis remonte progressivement.',
-  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Charge allégée après {0} séances sous le plan : {1} → {2} {3}.'
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Charge allégée après {0} séances sous le plan : {1} → {2} {3}.',
+  'Reduce assistance by': 'Réduire l’assistance de'
 }

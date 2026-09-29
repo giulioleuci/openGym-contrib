@@ -1791,5 +1791,6 @@ export default {
   'Back off to (%)': 'ลดเหลือ (%)',
   'after {0} · to {1}%': 'หลัง {0} · เหลือ {1}%',
   'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'เมื่อทำไม่ถึงแผนด้วยน้ำหนักเดิมครบจำนวนเซสชันนี้ น้ำหนักจะลดลงแล้วค่อย ๆ เพิ่มใหม่',
-  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'ลดน้ำหนักหลังทำไม่ถึงแผน {0} เซสชัน: {1} → {2} {3}.'
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'ลดน้ำหนักหลังทำไม่ถึงแผน {0} เซสชัน: {1} → {2} {3}.',
+  'Reduce assistance by': 'ลดแรงช่วยลง'
 }

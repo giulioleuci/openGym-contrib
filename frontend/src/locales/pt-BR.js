@@ -1126,7 +1126,8 @@ export const PT_BR_OVERRIDES = {
   'Back off to (%)': 'Reduzir para (%)',
   'after {0} · to {1}%': 'após {0} · para {1}%',
   'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'Depois de tantas sessões abaixo do plano com a mesma carga, a carga diminui e volta a subir.',
-  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Carga reduzida após {0} sessões abaixo do plano: {1} → {2} {3}.'
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Carga reduzida após {0} sessões abaixo do plano: {1} → {2} {3}.',
+  'Reduce assistance by': 'Reduzir a assistência em'
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

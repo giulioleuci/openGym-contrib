@@ -47,6 +47,16 @@ beforeEach(() => {
 })
 afterEach(() => { act(() => root.unmount()); host.remove() })
 
+describe('RuleEditor on an assistance machine', () => {
+  it('says the step takes help away, not that it adds load', () => {
+    render({ rule: linear(), assisted: true })
+    expect(host.textContent).toContain('Reduce assistance by')
+    expect(host.textContent).not.toContain('Increase load by')
+    render({ rule: linear() })
+    expect(host.textContent).toContain('Increase load by')
+  })
+})
+
 describe('RuleEditor deload', () => {
   const openDeload = () => act(() => [...host.querySelectorAll('button')].find(b => b.textContent.startsWith('Back off when stuck')).click())
   const stepper = label => [...host.querySelectorAll('.stp-w')].find(w => w.querySelector('.stp-l').textContent === label)

@@ -38,9 +38,12 @@ export function buildSessionExposures(profile, routine, ctx) {
   profile.prescriptions ||= {}
   return (routine?.ex || []).map((occ, i) => {
     const trackId = occ.occurrenceId
+    // An assistance machine's load is the help given: the engine runs every step the other way.
+    // An occurrence can say so itself (v1's per-exercise override), else the catalogue does.
+    const assisted = typeof occ.assisted === 'boolean' ? occ.assisted : isAssisted(occ.exerciseId)
     // The engine picks the history and decides a restart; this boundary only passes the profile.
     const context = resolveProgressionContext({
-      trackId, exerciseId: occ.exerciseId, rule: occ.rule,
+      trackId, exerciseId: occ.exerciseId, rule: occ.rule, assisted,
       workouts: profile.workouts, prescriptions: profile.prescriptions, progression: profile.progression
     })
     const prescription = generatePrescription({
@@ -52,8 +55,8 @@ export function buildSessionExposures(profile, routine, ctx) {
       reset: context.reset, heldLoad: context.heldLoad, startFrom: profile.startFrom,
       oneRm: currentOneRm(profile.oneRepMaxes, occ.exerciseId),
       // Lighter is harder on an assisted machine: a percentage ramp would run backwards.
-      warmup: isAssisted(occ.exerciseId) ? null : occ.warmup ?? null,
-      equipment: EXIDX[occ.exerciseId]?.eq ?? null,
+      warmup: assisted ? null : occ.warmup ?? null,
+      equipment: EXIDX[occ.exerciseId]?.eq ?? null, assisted,
       // What a deload needs to know about the movement (deload.js).
       perSide: occ.side === true, restPause: occ.intensifier?.type === 'restpause'
     })

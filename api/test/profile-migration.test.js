@@ -507,3 +507,65 @@ test('what v1 prescribed for an entry no prescription could hold stays on it, ve
   assert.deepEqual(deload.legacyTarget, { mode: 'reps' });
   assert.equal('legacyTarget' in bare || 'legacyPlanned' in bare, false);   // nothing was recorded, nothing is invented
 });
+
+// ---- assistance machines: the load is the help given, so progression runs the other way (issue #232) ----
+
+const assistedHistory = (loads, plan = { sets: 3, reps: 8, weight: 40, prog: 'linear' }, id = DIP) => v1({
+  routines: [{ id: 'r1', name: 'Pull', ex: [{ id, ...plan }] }],
+  workouts: loads.map(([w, reps], k) => ({
+    id: 'w' + k, d: `2026-01-0${k + 1}`, start: Date.UTC(2026, 0, k + 1, 18), end: Date.UTC(2026, 0, k + 1, 19), routineIds: ['r1'], routineId: 'r1',
+    entries: [{ id, rid: 'r1', target: { sets: 3, reps: 8, weight: w, mode: 'reps' }, sets: [row(reps, w), row(reps, w), row(reps, w)] }]
+  }))
+});
+const nextAfter = (profile, assisted = true) => {
+  const x = profile.workouts.at(-1).exposures[0];
+  return generatePrescription({ id: 'n', now: '2026-02-01T00:00:00.000Z', trackId: 'r1:o0', rule: profile.routines[0].ex[0].rule, state: profile.progression['r1:o0'],
+    lastPrescription: profile.prescriptions[x.prescriptionId], lastLog: { ...x, id: x.exposureId }, assisted });
+};
+
+test('a clean session on an assistance machine earns less help on the first v2 session', () => {
+  const { profile } = migrate(assistedHistory([[40, 8]]));
+  const p = profile.prescriptions[profile.workouts[0].exposures[0].prescriptionId];
+  assert.equal(p.assisted, true);
+  assert.equal(profile.progression['r1:o0'].readyToIncrement, true);
+  assert.equal(nextAfter(profile).parameters.load.resolved.value, 37.5);
+  assert.equal(nextAfter(profile, false).parameters.load.resolved.value, 42.5);   // the same history on a normal lift adds
+});
+
+test('a stalled assistance machine goes back to more help, from the most help it needed', () => {
+  const { profile } = migrate(assistedHistory([[40, 6], [40, 5], [40, 6]]));
+  assert.deepEqual(['stalls', 'readyToDeload'].map(k => profile.progression['r1:o0'][k]), [3, true]);
+  assert.equal(nextAfter(profile).parameters.load.resolved.value, 42.5);
+});
+
+test('the help logged on a session is judged by its weakest set: the one with the most', () => {
+  const state = assistedHistory([[40, 8]]);
+  state.workouts[0].entries[0].sets = [row(8, 40), row(8, 35), row(8, 45)];
+  const { profile } = migrate(state);
+  const x = profile.workouts[0].exposures[0];
+  assert.equal(x.actual.load.value, 45);
+  assert.equal(profile.progression['r1:o0'].readyToIncrement, false);   // 45 is more help than the 40 prescribed
+});
+
+test('a routine entry can say a machine is, or is not, assisted, whatever the catalogue says', () => {
+  const ex = [{ id: BENCH, sets: 3, reps: 8, weight: 20, prog: 'linear', assisted: true }, { id: DIP, sets: 3, reps: 8, weight: 20, prog: 'linear', assisted: false }, { id: DIP, sets: 3, reps: 8, weight: 20, prog: 'linear' }];
+  const { profile } = migrate(v1({ routines: [{ id: 'r1', name: 'Overrides', ex }], workouts: [] }));
+  assert.deepEqual(profile.routines[0].ex.map(o => o.assisted), [true, false, undefined]);
+  // Nothing to freeze without a session, but the exercise that is a plain lift stays one.
+  const custom = migrate(assistedHistory([[20, 8]], { sets: 3, reps: 8, weight: 20, prog: 'linear', assisted: false })).profile;
+  assert.equal(custom.prescriptions[custom.workouts[0].exposures[0].prescriptionId].assisted, undefined);
+  const forced = migrate(assistedHistory([[20, 8]], { sets: 3, reps: 8, weight: 20, prog: 'linear', assisted: true }, BENCH)).profile;
+  assert.equal(forced.prescriptions[forced.workouts[0].exposures[0].prescriptionId].assisted, true);
+});
+
+test('an assistance machine with no help on it climbs reps, as v1 did once the stack was out of the way', () => {
+  const ex = [{ id: DIP, sets: 3, reps: 8, prog: 'linear' }, { id: DIP, sets: 3, reps: 8, weight: 30, prog: 'linear' }];
+  const { profile } = migrate(v1({ routines: [{ id: 'r1', name: 'Pull', ex }], workouts: [] }));
+  assert.deepEqual(profile.routines[0].ex.map(o => o.rule.preset), ['bodyweight_ladder', 'linear']);
+});
+
+test('an in-progress session on an assistance machine freezes as one', () => {
+  const active = { id: 'a1', d: '2026-01-08', start: Date.UTC(2026, 0, 8, 18), routineIds: ['r1'], entries: [{ id: DIP, rid: 'r1', target: { sets: 3, reps: 8, weight: 35 }, sets: [row(8, 35)] }] };
+  const { profile, activeSession } = migrate({ ...assistedHistory([[40, 8]]), active });
+  assert.equal(profile.prescriptions[activeSession.exposures[0].prescriptionId].assisted, true);
+});

@@ -1780,5 +1780,6 @@ export default {
   'Back off to (%)': 'Zmniejsz do (%)',
   'after {0} · to {1}%': 'po {0} · do {1}%',
   'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'Po tylu sesjach poniżej planu z tym samym ciężarem ciężar spada i znów rośnie.',
-  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Zmniejszono ciężar po {0} sesjach poniżej planu: {1} → {2} {3}.'
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Zmniejszono ciężar po {0} sesjach poniżej planu: {1} → {2} {3}.',
+  'Reduce assistance by': 'Zmniejsz wsparcie o'
 }

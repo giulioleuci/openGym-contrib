@@ -22,13 +22,16 @@ const targetMax = (p, a) => {
   return actual != null && actual >= range.max
 }
 
-// At least what was prescribed, on the rows that decide.
+// At least what was prescribed, on the rows that decide. On an assistance machine the load is the
+// help given, so "at least" runs the other way: no more help than prescribed, and no help logged
+// at all is the best a set can be.
 function hit(p, a) {
   const rows = decidingRows(p)
   const actual = targetActual(p, a)
   if (!(a.sets >= p.parameters.sets.min) || actual == null || actual < Math.min(...rows.map(r => targetRange(p, r).min))) return false
   const loads = rows.map(r => r.load?.value).filter(Number.isFinite)
-  return !loads.length || (a.load?.value ?? -Infinity) >= Math.min(...loads)
+  if (!loads.length) return true
+  return p.assisted ? (a.load?.value ?? 0) <= Math.max(...loads) : (a.load?.value ?? -Infinity) >= Math.min(...loads)
 }
 
 const GATES = {
@@ -44,7 +47,7 @@ const PASSES = {
   target_load: (p, a) => {
     const target = p.target.resolved?.value
     const load = a.load?.value ?? p.parameters.load.resolved?.value
-    return target != null && load != null && load >= target
+    return target != null && load != null && (p.assisted ? load <= target : load >= target)
   },
   max_sets: (p, a) => a.sets >= p.parameters.sets.max,
   max_reps: targetMax,

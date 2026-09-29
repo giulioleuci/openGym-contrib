@@ -3,6 +3,7 @@ import { buildSessionExposures } from './session-start.js'
 import { entriesForExposures } from './session-ui-adapter.js'
 import { buildCompletedSession } from './finish-session.js'
 import { ruleOccurrence } from './test-fixtures.js'
+import { EXIDX, isAssisted } from './exercises.js'
 
 // start -> finish -> write state -> start, on real functions and a store-shaped profile.
 const DAY = 24 * 3600 * 1000
@@ -104,5 +105,45 @@ describe('a cardio interval, start to finish', () => {
     expect(log.mode).toBe('cardio')
     expect(log.performance.sets[0].observations).toEqual([{ metric: 'duration', unit: 's', value: 1800 }, { metric: 'speed', unit: 'kmh', value: 9.5 }])
     expect(log.actual).toMatchObject({ sets: 1, durationSeconds: 1800, speed: 9.5 })
+  })
+})
+
+describe('an assistance machine, start to finish (the load is the help, so progress is less of it)', () => {
+  const MACHINE = Object.keys(EXIDX).find(k => isAssisted(k))
+  const plan = (id = MACHINE, extra = {}) => ({ ...ruleOccurrence(id, { patch: r => ({ ...r, target: { mode: 'none' }, completion: [], parameters: { ...r.parameters, load: { mode: 'absolute', value: 40, unit: 'kg' } } }) }), ...extra })
+  const shortSession = (S, occ, day) => {
+    const a = start(S, occ, day)
+    a.entries[0].sets.forEach(s => { s.r = 4 })
+    return { a, log: finish(S, a, day) }
+  }
+  it('every clean session takes 2.5 kg of help away', () => {
+    const S = profile(), occ = plan()
+    const loads = [0, 1, 2].map(day => { const { a } = session(S, occ, day); return loadOf(S, a) })
+    expect(loads).toEqual([40, 37.5, 35])
+    expect(S.prescriptions[S.workouts[0].exposures[0].prescriptionId].assisted).toBe(true)
+    expect(loadOf(S, start(S, occ, 3))).toBe(32.5)
+  })
+  it('a normal lift on the same rule adds instead', () => {
+    const S = profile(), occ = plan('0025')
+    const loads = [0, 1].map(day => { const { a } = session(S, occ, day); return loadOf(S, a) })
+    expect(loads).toEqual([40, 42.5])
+  })
+  it('three short sessions in a row go back to more help, and progress resumes from there', () => {
+    const S = profile(), occ = plan()
+    for (const day of [0, 1, 2]) shortSession(S, occ, day)
+    const a4 = start(S, occ, 3)
+    expect(loadOf(S, a4)).toBe(42.5)
+    expect(S.prescriptions[a4.exposures[0].prescriptionId].provenance.deload).toMatchObject({ from: 40, to: 42.5, method: 'assist' })
+    expect(a4.entries[0].sets.map(s => s.w)).toEqual([42.5, 42.5, 42.5])
+    finish(S, a4, 3)
+    expect(loadOf(S, start(S, occ, 4))).toBe(40)
+  })
+  it('an occurrence can say a machine is not assisted, or that another is', () => {
+    const S = profile()
+    expect(loadOf(S, session(S, plan(MACHINE, { assisted: false }), 0).a)).toBe(40)
+    expect(loadOf(S, start(S, plan(MACHINE, { assisted: false }), 1))).toBe(42.5)
+    const T = profile()
+    session(T, plan('0025', { assisted: true }), 0)
+    expect(loadOf(T, start(T, plan('0025', { assisted: true }), 1))).toBe(37.5)
   })
 })

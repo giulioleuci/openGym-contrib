@@ -1780,5 +1780,6 @@ export default {
   'Back off to (%)': 'घटाकर (%) करें',
   'after {0} · to {1}%': '{0} के बाद · {1}% तक',
   'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'एक ही वज़न पर योजना से कम रहने वाले इतने सत्रों के बाद वज़न घटता है और फिर से बढ़ता है।',
-  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'योजना से कम रहे {0} सत्रों के बाद वज़न घटाया गया: {1} → {2} {3}.'
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'योजना से कम रहे {0} सत्रों के बाद वज़न घटाया गया: {1} → {2} {3}.',
+  'Reduce assistance by': 'सहायता कम करें'
 }

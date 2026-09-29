@@ -1781,5 +1781,6 @@ export default {
   'Back off to (%)': 'Scarica al (%)',
   'after {0} · to {1}%': 'dopo {0} · al {1}%',
   'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'Dopo tante sessioni sotto il piano con lo stesso carico, il carico scende e poi risale.',
-  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Scaricato dopo {0} sessioni sotto il piano: {1} → {2} {3}.'
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Scaricato dopo {0} sessioni sotto il piano: {1} → {2} {3}.',
+  'Reduce assistance by': 'Riduci l’assistenza di'
 }

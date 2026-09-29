@@ -1780,5 +1780,6 @@ export default {
   'Back off to (%)': '减至（%）',
   'after {0} · to {1}%': '{0} 次后 · 减至 {1}%',
   'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': '以相同重量连续这么多次训练未达计划后，重量会下调，然后重新递增。',
-  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': '连续 {0} 次训练未达计划，已减重：{1} → {2} {3}。'
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': '连续 {0} 次训练未达计划，已减重：{1} → {2} {3}。',
+  'Reduce assistance by': '减少辅助量'
 }

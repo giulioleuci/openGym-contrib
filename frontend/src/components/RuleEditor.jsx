@@ -106,7 +106,7 @@ function LoadField({ label, value, upTo, rangeable = false, unit, step, noneMode
 
 const withoutLoadTo = ({ loadTo, ...rest }) => rest
 
-export default function RuleEditor({ rule, unit, effort, onChange }) {
+export default function RuleEditor({ rule, unit, effort, assisted = false, onChange }) {
   const def = PRESETS[rule.preset]
   const p = rule.parameters
   const s = rule.special || {}
@@ -157,7 +157,7 @@ export default function RuleEditor({ rule, unit, effort, onChange }) {
 
     {loaded && <div style={{ marginTop: 22, marginBottom: 14 }}>
       <div className="sect-b" style={{ marginBottom: 8 }}>
-        <SelectRow title={t('Increase load by')} sheetTitle={t('Increase load by')} value={rule.increment.type}
+        <SelectRow title={assisted ? t('Reduce assistance by') : t('Increase load by')} sheetTitle={assisted ? t('Reduce assistance by') : t('Increase load by')} value={rule.increment.type}
           onChange={type => set({ increment: type === 'absolute' ? { type, value: step, unit } : { type, value: 2.5 } })}
           options={incrementTypes.map(type => ({ value: type, label: t(INCREMENT_LABEL[type]) }))} />
       </div>

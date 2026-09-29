@@ -1783,5 +1783,6 @@ export default {
   'Back off to (%)': 'Csökkentés erre (%)',
   'after {0} · to {1}%': '{0} után · {1}%-ra',
   'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'Ennyi, a tervet nem teljesítő edzés után azonos terheléssel a terhelés visszaesik, majd újra épül.',
-  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Csökkentve {0} tervet nem teljesítő edzés után: {1} → {2} {3}.'
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Csökkentve {0} tervet nem teljesítő edzés után: {1} → {2} {3}.',
+  'Reduce assistance by': 'Segítség csökkentése ennyivel'
 }

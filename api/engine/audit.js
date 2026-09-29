@@ -44,8 +44,9 @@ export function auditExecution(prescription, actual, state = null) {
   if (load != null) {
     if (planned.load) outside(out, 'load', { min: planned.load.value, max: planned.loadTo?.value ?? planned.load.value }, load, at)
     else if (missingReference(prescription)) out.push(finding('missing_reference', 'load', null, load, at))
+    // The target is a cap on the work and a floor on the help an assistance machine gives.
     const cap = prescription.target.resolved?.value
-    if (cap != null && load > cap) out.push(finding('above_cap', 'load', cap, load, at))
+    if (cap != null && (prescription.assisted ? load < cap : load > cap)) out.push(finding('above_cap', 'load', cap, load, at))
   }
   outside(out, 'durationSeconds', p.durationSeconds, actual.durationSeconds, at)
   outside(out, 'rir', p.rir, normalizeEffort(actual).rir, at)
@@ -55,7 +56,8 @@ export function auditExecution(prescription, actual, state = null) {
 /**
  * The exercise-level actual that completion reads: every completed work set is counted, and the
  * weakest deciding set (a pyramid's anchor rows, otherwise all rows) supplies reps, load,
- * duration and effort. Values are copied exactly as logged.
+ * duration and effort — for an assistance machine that is the set with the most help. Values are
+ * copied exactly as logged.
  */
 export function summarizeActual(prescription, performed) {
   const anchors = prescription.rows.flatMap((r, i) => (r.anchor ? [i] : []))
@@ -69,7 +71,7 @@ export function summarizeActual(prescription, performed) {
   return {
     sets: performed.length,
     reps: least(deciding.map(s => s.reps)),
-    load: loads.length ? { ...loads.reduce((a, b) => (b.value < a.value ? b : a)) } : null,
+    load: loads.length ? { ...loads.reduce((a, b) => ((prescription.assisted ? b.value > a.value : b.value < a.value) ? b : a)) } : null,
     ...(durationSeconds != null ? { durationSeconds } : {}),
     ...(speed != null ? { speed } : {}),
     ...(rir != null ? { rir } : {}),

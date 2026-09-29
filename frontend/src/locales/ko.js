@@ -1780,5 +1780,6 @@ export default {
   'Back off to (%)': '낮출 비율 (%)',
   'after {0} · to {1}%': '{0}회 후 · {1}%로',
   'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': '같은 중량으로 계획에 못 미친 세션이 이만큼 이어지면 중량을 낮춘 뒤 다시 올립니다.',
-  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': '계획에 못 미친 {0}회 세션 후 중량을 낮췄습니다: {1} → {2} {3}.'
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': '계획에 못 미친 {0}회 세션 후 중량을 낮췄습니다: {1} → {2} {3}.',
+  'Reduce assistance by': '보조를 줄일 양'
 }

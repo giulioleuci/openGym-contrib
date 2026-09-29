@@ -1367,6 +1367,8 @@ function ExConfig({ ex, existing, onSave, onDelete, onReplace, close, routine, s
   const [rule, setRule] = useState(() => (existing?.rule ? cloneJSON(existing.rule) : defaultRuleFor(ex, routine, st.unit)))
   const [note, setNote] = useState(() => existing?.note || '')
   const speedUnit = speedUnitOf(st)
+  // The load of an assistance machine is the help given: the rule steps it down (issue #232).
+  const assisted = typeof existing?.assisted === 'boolean' ? existing.assisted : isAssisted(ex.id)
   const [cardioCfg, setCardioCfg] = useState(() => existing?.cardio || cardioOf(existing?.rule) || { sets: 4, min: 20, speed: 8 })
   const [intensifierRaw, setIntensifier] = useState(() => existing?.intensifier || null)
   const [warmupRaw, setWarmup] = useState(() => existing?.warmup || { mode: 'off' })
@@ -1396,7 +1398,11 @@ function ExConfig({ ex, existing, onSave, onDelete, onReplace, close, routine, s
     // Any edit is an explicit plan edit: a new revision, which is what reopens a completed track.
     const revision = before && canonicalJSON(before) !== canonicalJSON(planned) ? before.revision + 1 : planned.revision
     const trimmedNote = (note || '').trim().slice(0, 500)
+    // A saved config replaces the occurrence, so what this sheet does not edit rides along: a
+    // machine marked (not) assisted, a ramp's own rest, an exercise kept out of progression.
+    const kept = Object.fromEntries(['assisted', 'warmupRestSec', 'excludeFromProgression'].filter(key => existing?.[key] != null).map(key => [key, existing[key]]))
     onSave({
+      ...kept,
       occurrenceId, exerciseId: ex.id, rule: { ...planned, revision },
       ...(cardio ? { mode: 'cardio', cardio: cardioPlan } : {}),
       ...(!cardio && warmup.mode !== 'off' ? { warmup } : {}),
@@ -1425,7 +1431,7 @@ function ExConfig({ ex, existing, onSave, onDelete, onReplace, close, routine, s
       {/* Typed and stepped in the profile's unit, kept in km/h (lib/speed.js). */}
       <Stepper label={speedUnit === 'mph' ? t('Speed (mph)') : t('Speed (km/h)')} value={toSpeed(cardioCfg.speed, speedUnit)} step={0.5}
         onChange={v => setCardioCfg(x => ({ ...x, speed: fromSpeed(v, speedUnit) }))} />
-    </div> : <RuleEditor rule={rule} unit={st.unit} effort={effortOf(st) !== 'none'} onChange={setRule} />}
+    </div> : <RuleEditor rule={rule} unit={st.unit} effort={effortOf(st) !== 'none'} assisted={assisted} onChange={setRule} />}
 
     {!cardio && <>
       <h4 className="sec">{t('Advanced options')}</h4>

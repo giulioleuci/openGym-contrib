@@ -180,6 +180,8 @@ function draftRoutines(state, ctx) {
       const mode = modeOf(cfg, info);
       const d = {
         routineId: id, occurrenceId: `${id}:o${j}`, exerciseId, cfg, info, mode,
+        // An assistance machine's load is the help given (v1 issue #232); a routine entry can override the catalogue.
+        assisted: typeof cfg.assisted === 'boolean' ? cfg.assisted : isAssisted(info),
         preset: presetForPolicy(policyOf(cfg, routine, mode), mode, isBodyweight(cfg, info)),
         excluded: routine.excludeFromProgression === true || cfg.excludeFromProgression === true,
         links: []
@@ -200,6 +202,7 @@ const occurrenceOf = d => ({
   ...(whole(d.cfg.restSec) ? { restSec: whole(d.cfg.restSec) } : {}),
   ...(whole(d.cfg.warmupRestSec) ? { warmupRestSec: whole(d.cfg.warmupRestSec) } : {}),
   ...(d.cfg.excludeFromProgression === true ? { excludeFromProgression: true } : {}),
+  ...(typeof d.cfg.assisted === 'boolean' ? { assisted: d.cfg.assisted } : {}),
   ...(d.cfg.side === true && d.mode === 'reps' ? { side: true } : {}),
   // Only where it overrides the catalogue, the way v1 wrote it.
   ...(d.mode !== 'cardio' && d.cfg.bodyweight != null && !!d.cfg.bodyweight !== BODYWEIGHT_EQ.has(d.info?.eq) ? { bodyweight: !!d.cfg.bodyweight } : {}),
@@ -230,8 +233,9 @@ function finalizeDraft(d, ctx) {
   d.inc = incrementOf(d.cfg, d.info, d.mode, ctx.unit);
   // The rounding step is a load step; a timed hold's `inc` is seconds.
   d.step = stepFor(loads, d.mode === 'reps' ? d.inc : null, ctx.unit);
-  // v1 climbed reps, not load, where nothing is loaded and the equipment is no load of its own.
-  if (d.preset === 'linear' && !loads.length && !LOADED_EQ.has(d.info?.eq)) d.preset = 'bodyweight_ladder';
+  // v1 climbed reps, not load, where nothing is loaded and the equipment is no load of its own — or
+  // the machine only takes load off you, and no help left is where its progression leads.
+  if (d.preset === 'linear' && !loads.length && (d.assisted || !LOADED_EQ.has(d.info?.eq))) d.preset = 'bodyweight_ladder';
   d.ruleFor = (values, step = d.step, reps) => ruleFrom({ ...d.cfg, ...values }, {
     id: `rule:${d.occurrenceId}`, routineId: d.routineId, exerciseId: d.exerciseId,
     preset: d.preset, unit: ctx.unit, mode: d.mode, step, rest: ctx.rest, inc: d.inc, reps
@@ -254,7 +258,7 @@ function finalizeDraft(d, ctx) {
       const fingerprint = !link.planned ? null
         : unedited ? planFingerprint(d.ruleFor({}))
         : planFingerprint(d.ruleFor({ repsMin: null, repsMax: null, ...link.planned }));
-      link.prescription = generatePrescription({ id: `${link.workoutId}:p${link.j}`, now: link.at, trackId: d.occurrenceId, rule: d.ruleFor(link.values, d.step, dayWindow(link)), fingerprint });
+      link.prescription = generatePrescription({ id: `${link.workoutId}:p${link.j}`, now: link.at, trackId: d.occurrenceId, rule: d.ruleFor(link.values, d.step, dayWindow(link)), fingerprint, assisted: d.assisted });
       return true;
     } catch { return false; }   // a target the engine cannot express stays readable legacy history
   });
@@ -446,7 +450,7 @@ function migrateActive(active, ctx) {
       mode: modeOf(target, info), step: fit(STEPS[ctx.unit][0]), rest: ctx.rest
     });
     const trackId = d ? d.occurrenceId : `${id}:t${j}`;
-    const prescription = generatePrescription({ id: `${id}:p${j}`, now, trackId, rule });
+    const prescription = generatePrescription({ id: `${id}:p${j}`, now, trackId, rule, assisted: d ? d.assisted : isAssisted(info) });
     ctx.prescriptions[prescription.id] = prescription;
     const exposureId = `${id}:x${j}`;
     exposures.push({

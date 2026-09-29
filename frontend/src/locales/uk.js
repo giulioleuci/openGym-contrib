@@ -1761,5 +1761,6 @@ export default {
   'Back off to (%)': 'Знизити до (%)',
   'after {0} · to {1}%': 'після {0} · до {1}%',
   'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'Якщо стільки тренувань поспіль з тією самою вагою не дотягнули до плану, вага знижується і знову зростає.',
-  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Вагу знижено після {0} тренувань нижче плану: {1} → {2} {3}.'
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Вагу знижено після {0} тренувань нижче плану: {1} → {2} {3}.',
+  'Reduce assistance by': 'Зменшувати допомогу на'
 }

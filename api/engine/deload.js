@@ -111,9 +111,20 @@ export function selectDeloadCandidate({ currentWeight, targetWeight, targetReps,
  * use the Epley selection (v1 epleyDeload); everything else — Greyskull, rest-pause rows, a rounding
  * with no step — takes `factor` of the load. `lifted` is the lightest load actually done, and
  * bounds the result when it was below the prescription.
- * @returns {{ value: number, reps: number|null, method: 'epley'|'factor' }}
+ *
+ * An assistance machine backs off the other way (v1 `easier`): one step more help than the set
+ * that stalled — the most help it needed, whichever of the plan and the log that was. Epley reads
+ * load as the work done; there it is the work taken away, so the factor has no meaning.
+ * @returns {{ value: number, reps: number|null, method: 'epley'|'factor'|'assist' }}
  */
-export function deloadedLoad({ preset, rounding, factor, prescribed, lifted = null, reps = null, repsMin = null, perSide = false, restPause = false }) {
+export function deloadedLoad({ preset, rounding, factor, prescribed, lifted = null, reps = null, repsMin = null, perSide = false, restPause = false, assisted = false, step = null }) {
+  if (assisted) {
+    const needed = Math.max(prescribed, lifted ?? 0)
+    const more = rounding.mode === 'allowed_values'
+      ? rounding.allowedValues.find(v => v > needed) ?? needed
+      : roundLoad(needed + (step > 0 ? step : rounding.step), rounding)
+    return { value: more, reps: null, method: 'assist' }
+  }
   const current = lifted > 0 && lifted < prescribed ? lifted : prescribed
   if ((preset === 'linear' || preset === 'double') && rounding.mode !== 'allowed_values' && !restPause && reps >= 1) {
     const found = selectDeloadCandidate({ currentWeight: current, targetWeight: prescribed, targetReps: reps, step: rounding.step, factor, reps, repsMin: preset === 'double' ? repsMin : undefined, perSide })

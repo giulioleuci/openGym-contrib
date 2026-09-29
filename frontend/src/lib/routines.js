@@ -70,10 +70,12 @@ export function replaceSlotExercise(slot, id, S, rid) {
   const unit = S?.unit === 'lb' ? 'lb' : 'kg'
   const preset = isCardio(id) ? 'manual' : isBodyweightEq(id) ? 'bodyweight_ladder' : 'linear'
   const fresh = defaultPlanRule(preset, { id: occurrenceId, exerciseId: id, routineId: rid ?? null, unit })
-  const sameKind = isCardio(old.exerciseId) === isCardio(id) && isBodyweightEq(old.exerciseId) === isBodyweightEq(id) && isAssisted(old.exerciseId) === isAssisted(id)
+  const sameKind = isCardio(old.exerciseId) === isCardio(id) && isBodyweightEq(old.exerciseId) === isBodyweightEq(id) && (typeof old.assisted === 'boolean' ? old.assisted : isAssisted(old.exerciseId)) === isAssisted(id)
   if (!sameKind || !old.rule) {
     const kept = Object.fromEntries(['sg', 'note'].filter(key => old[key] != null).map(key => [key, old[key]]))
     return { occurrenceId, exerciseId: id, rule: fresh, ...kept }
   }
-  return { ...old, occurrenceId, exerciseId: id, rule: { ...old.rule, id: occurrenceId, exerciseId: id, revision: 1 } }
+  // "Assisted" describes the movement, not the prescription: the new exercise follows its own.
+  const { assisted: _movement, ...carried } = old
+  return { ...carried, occurrenceId, exerciseId: id, rule: { ...old.rule, id: occurrenceId, exerciseId: id, revision: 1 } }
 }

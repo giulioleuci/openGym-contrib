@@ -58,8 +58,9 @@ function rowsFor(rule, { load, loadTo, trainingMax, position, count }) {
  * @param {string|null} [input.fingerprint]      the plan this log was built from; default: this rule's
  * @param {boolean} [input.perSide]              unilateral work: a deload counts reps per limb
  * @param {boolean} [input.restPause]            rest-pause rows: a deload takes the plain factor, not a rep trade
+ * @param {boolean} [input.assisted]             an assistance machine: the load is the help given, so every automated step runs the other way (issue #232)
  */
-export function generatePrescription({ id, now, trackId, rule, state = null, lastPrescription = null, lastLog = null, oneRm = null, warmup = null, equipment = null, reset = null, heldLoad = null, startFrom = 'plan', fingerprint, perSide = false, restPause = false }) {
+export function generatePrescription({ id, now, trackId, rule, state = null, lastPrescription = null, lastLog = null, oneRm = null, warmup = null, equipment = null, reset = null, heldLoad = null, startFrom = 'plan', fingerprint, perSide = false, restPause = false, assisted = false }) {
   const check = validatePlanRule(rule)
   if (!check.ok) throw new Error(`invalid plan rule ${rule?.id}: ${check.errors.join('; ')}`)
   // A restarted plan is a fresh track: no earned step, no rung or week, no completed status.
@@ -84,7 +85,7 @@ export function generatePrescription({ id, now, trackId, rule, state = null, las
   const hold = !!reset && !!heldLoad && p.load.mode === 'absolute' && (!lastPrescription || same(lastPrescription.basis, p.load))
   let expression = hold ? { mode: 'absolute', value: heldLoad.value, unit: heldLoad.unit }
     : (!reset && carry) ? copy(lastPrescription.parameters.load.expression) : copy(p.load)
-  if (increments) expression = applyIncrement(expression, rule.increment, { snapshot1RM, resolvedTarget: target.resolved?.value ?? null })
+  if (increments) expression = applyIncrement(expression, rule.increment, { snapshot1RM, resolvedTarget: target.resolved?.value ?? null, assisted })
 
   // A stalled track backs off (v1 deload, deload.js): the load for a loaded preset, the sliding
   // window for a timed hold. Only a carried track can — a restart already holds what was lifted.
@@ -94,16 +95,17 @@ export function generatePrescription({ id, now, trackId, rule, state = null, las
   if (backsOff && gate !== 'seconds' && expression.mode === 'absolute') {
     const out = deloadedLoad({
       preset: rule.preset, rounding: rule.rounding, factor: rule.deload.factor, prescribed: expression.value,
-      lifted: lastLog?.actual?.load?.value ?? null, reps: lastPrescription.prefill?.reps ?? null, repsMin: p.reps.min, perSide, restPause
+      lifted: lastLog?.actual?.load?.value ?? null, reps: lastPrescription.prefill?.reps ?? null, repsMin: p.reps.min, perSide, restPause,
+      assisted, step: rule.increment.type === 'absolute' ? rule.increment.value : null
     })
     deload = { stalls: state.stalls, from: expression.value, to: out.value, method: out.method, ...(out.reps != null ? { reps: out.reps } : {}) }
     expression = { ...expression, value: out.value }
-  } else if (backsOff && gate !== 'seconds' && expression.mode === 'percent_1rm') {
+  } else if (backsOff && gate !== 'seconds' && expression.mode === 'percent_1rm' && !assisted) {
     const percent = deloadPercent(expression.percent, rule.deload.factor)
     deload = { stalls: state.stalls, from: expression.percent, to: percent, method: 'factor' }
     expression = { ...expression, percent }
   }
-  const resolve = e => resolveLoad(e, { snapshot1RM, rounding: rule.rounding, cap: target.resolved?.value ?? null })
+  const resolve = e => resolveLoad(e, { snapshot1RM, rounding: rule.rounding, cap: target.resolved?.value ?? null, assisted })
   const load = { expression, resolved: resolve(expression) }
   // A load range's high end: only presets without automated load steps allow one, so it is
   // always the rule's own expression.
@@ -151,6 +153,8 @@ export function generatePrescription({ id, now, trackId, rule, state = null, las
     id, generatedAt: now, planRuleId: rule.id, planRuleRevision: rule.revision,
     planFingerprint: fingerprint === undefined ? planFingerprint(rule) : fingerprint,
     exerciseId: rule.exerciseId, trackId, preset: rule.preset,
+    // Frozen with the prescription: finishing it (advance.js, audit.js) reads the load the same way.
+    ...(assisted ? { assisted: true } : {}),
     statusAtGeneration: status,
     snapshot1RM,
     parameters: {

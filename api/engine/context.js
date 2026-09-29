@@ -12,13 +12,16 @@ export function planFingerprint(rule) {
 
 const isWork = row => row.status === 'completed' && row.role !== 'warmup'
 
-/** The lightest completed working load of a log: its summary, else its rows (legacy and imported history). */
-function liftedLoad(x) {
+/**
+ * The weakest completed working load of a log — the lightest, or on an assistance machine the one
+ * with the most help: its summary, else its rows (legacy and imported history).
+ */
+function liftedLoad(x, assisted) {
   if (x.actual?.load) return { ...x.actual.load }
   const loads = (x.performance?.sets || []).filter(r => isWork(r) && r.resistance?.kind === 'external-load')
   if (!loads.length) return null
-  const min = loads.reduce((a, b) => (b.resistance.value < a.resistance.value ? b : a)).resistance
-  return { value: min.value, unit: min.unit }
+  const weakest = loads.reduce((a, b) => ((assisted ? b.resistance.value > a.resistance.value : b.resistance.value < a.resistance.value) ? b : a)).resistance
+  return { value: weakest.value, unit: weakest.unit }
 }
 
 function newest(workouts, match) {
@@ -53,7 +56,7 @@ export function replayProgression({ workouts = [], trackId, prescriptions = {}, 
  * A reset (#275): the baseline's recorded plan differs from this rule's, or the baseline was
  * borrowed and records no plan. An own log with no recorded plan never resets.
  */
-export function resolveProgressionContext({ trackId, exerciseId, rule, workouts = [], prescriptions = {}, progression = {} }) {
+export function resolveProgressionContext({ trackId, exerciseId, rule, workouts = [], prescriptions = {}, progression = {}, assisted = false }) {
   const own = newest(workouts, x => x.trackId === trackId && x.prescriptionId && !x.excludedFromProgression)
   const borrowed = own ? null : newest(workouts, x => x.exerciseId === exerciseId
     && (!x.prescriptionId || !x.excludedFromProgression) && (x.performance?.sets || []).some(isWork))
@@ -69,5 +72,5 @@ export function resolveProgressionContext({ trackId, exerciseId, rule, workouts 
   const recorded = lastPrescription?.planFingerprint ?? null
   const reset = recorded ? (recorded !== planFingerprint(rule) ? 'plan_changed' : null)
     : source === 'exercise' ? 'first_in_routine' : null
-  return { baseline, source, reset, state: reset ? null : state, lastPrescription, heldLoad: baseline ? liftedLoad(baseline) : null }
+  return { baseline, source, reset, state: reset ? null : state, lastPrescription, heldLoad: baseline ? liftedLoad(baseline, assisted) : null }
 }
