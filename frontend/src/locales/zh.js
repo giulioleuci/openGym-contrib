@@ -1772,5 +1772,13 @@ export default {
   'Seconds added per step': '每步增加的秒数',
   'Apply RPT': '应用 RPT',
   'Same reps every set': '每组次数相同',
-  'Load only goes up if your hardest set left at least this many reps in reserve.': '只有最难的一组至少还留有这么多次余力时，重量才会增加。'
+  'Load only goes up if your hardest set left at least this many reps in reserve.': '只有最难的一组至少还留有这么多次余力时，重量才会增加。',
+  // --- deload: the load backs off after repeated misses ---
+  'Back off when stuck': '停滞时减重',
+  'Back off after repeated misses': '连续失败后减重',
+  'Missed sessions in a row': '连续未达标的训练次数',
+  'Back off to (%)': '减至（%）',
+  'after {0} · to {1}%': '{0} 次后 · 减至 {1}%',
+  'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': '以相同重量连续这么多次训练未达计划后，重量会下调，然后重新递增。',
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': '连续 {0} 次训练未达计划，已减重：{1} → {2} {3}。'
 }

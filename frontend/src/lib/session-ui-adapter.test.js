@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { defaultPlanRule, generatePrescription } from './prescription/index.js'
-import { entriesForExposures, exposuresWithPerformance, loadStepFor, planSummary, rowFindings, rowIndexOf, rowsOfPerformance } from './session-ui-adapter.js'
+import { cardioParameters, defaultPlanRule, generatePrescription } from './prescription/index.js'
+import { actualOfRow, entriesForExposures, exposuresWithPerformance, loadStepFor, planSummary, rowFindings, rowIndexOf, rowsOfPerformance } from './session-ui-adapter.js'
 import { makeSideSet, toggleSide } from './workout-model.js'
 import { legacyEntriesOf } from './prescription/index.js'
 import { volumeOf } from './history.js'
@@ -136,6 +136,25 @@ describe('saved rows read back as the rows that were logged', () => {
     const limb = (w, done) => ({ role: 'work', status: done ? 'completed' : 'skipped', observations: [{ metric: 'repetitions', value: 5 }], resistance: { kind: 'external-load', value: w }, segments: [] })
     const [row] = rowsOfPerformance([{ ...limb(22.5, false), sides: { L: limb(22.5, true), R: limb(20, false) } }])
     expect(row.sides).toEqual({ L: { w: 22.5, r: 5, done: true }, R: { w: 20, r: 5, done: false } })
+  })
+})
+
+describe('entriesForExposures cardio', () => {
+  const rule = { ...defaultPlanRule('manual', { id: 'rc', exerciseId: '3220', unit: 'kg' }), parameters: { ...defaultPlanRule('manual', { id: 'rc', exerciseId: '3220', unit: 'kg' }).parameters, ...cardioParameters({ sets: 2, min: 25, speed: 9.5 }) } }
+  const p = generatePrescription({ id: 'pc', now: NOW, trackId: 'tc', rule })
+  it('opens minutes-and-speed rows and says it is cardio, not a hold', () => {
+    const [entry] = entriesForExposures([{ exposureId: 'x', exerciseId: '3220', prescriptionId: 'pc', mode: 'cardio' }], { pc: p })
+    expect(entry.target).toMatchObject({ mode: 'cardio', sets: 2, min: 25, speed: 9.5 })
+    expect(entry.target).not.toHaveProperty('sec')
+    expect(entry.sets).toEqual([{ setId: 'r0', done: false, min: 25, speed: 9.5 }, { setId: 'r1', done: false, min: 25, speed: 9.5 }])
+  })
+  it('a hold with the same duration stays a timed set', () => {
+    const [entry] = entriesForExposures([{ exposureId: 'x', exerciseId: '0001', prescriptionId: 'pc', mode: 'time' }], { pc: p })
+    expect(entry.target).toMatchObject({ mode: 'time', sec: 1500 })
+    expect(entry.sets[0]).toEqual({ setId: 'r0', done: false, sec: 1500 })
+  })
+  it('a finished cardio row is a duration in seconds and a speed to the engine', () => {
+    expect(actualOfRow({ setId: 'r0', done: true, min: 20, speed: 9 }, 'kg')).toMatchObject({ row: 0, reps: null, durationSeconds: 1200, speed: 9 })
   })
 })
 

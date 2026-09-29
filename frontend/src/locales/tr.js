@@ -1772,5 +1772,13 @@ export default {
   'Seconds added per step': 'Adım başına eklenen saniye',
   'Apply RPT': 'RPT uygula',
   'Same reps every set': 'Her sette aynı tekrar',
-  'Load only goes up if your hardest set left at least this many reps in reserve.': 'Yük yalnızca en zor setinde en az bu kadar tekrar yedekte kaldıysa artar.'
+  'Load only goes up if your hardest set left at least this many reps in reserve.': 'Yük yalnızca en zor setinde en az bu kadar tekrar yedekte kaldıysa artar.',
+  // --- deload: the load backs off after repeated misses ---
+  'Back off when stuck': 'Takılınca yükü düşür',
+  'Back off after repeated misses': 'Tekrarlanan başarısızlıktan sonra yükü düşür',
+  'Missed sessions in a row': 'Üst üste kaçırılan antrenmanlar',
+  'Back off to (%)': 'Şuna düşür (%)',
+  'after {0} · to {1}%': '{0} sonra · %{1}',
+  'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'Aynı yükle planın altında kalan bu kadar antrenmandan sonra yük düşer ve yeniden artar.',
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Planın altında kalan {0} antrenmandan sonra yük düşürüldü: {1} → {2} {3}.'
 }

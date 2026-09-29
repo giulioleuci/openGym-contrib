@@ -47,6 +47,39 @@ beforeEach(() => {
 })
 afterEach(() => { act(() => root.unmount()); host.remove() })
 
+describe('RuleEditor deload', () => {
+  const openDeload = () => act(() => [...host.querySelectorAll('button')].find(b => b.textContent.startsWith('Back off when stuck')).click())
+  const stepper = label => [...host.querySelectorAll('.stp-w')].find(w => w.querySelector('.stp-l').textContent === label)
+  it('shows v1\'s default for a progressing preset and lets it be turned off and on', () => {
+    const onChange = render({ rule: linear() })
+    expect(host.textContent).toContain('after 3 · to 90%')
+    openDeload()
+    act(() => host.querySelector('.disc-body [role="switch"]').click())
+    const off = onChange.mock.calls.at(-1)[0]
+    expect(off).not.toHaveProperty('deload')
+    const on = render({ rule: off })
+    if (!host.querySelector('.disc-body')) openDeload()   // the same editor instance keeps its disclosure open
+    act(() => host.querySelector('.disc-body [role="switch"]').click())
+    expect(on.mock.calls.at(-1)[0].deload).toEqual({ after: 3, factor: 0.9 })
+  })
+  it('edits how many misses and how far back, kept inside the engine\'s bounds', () => {
+    const onChange = render({ rule: { ...linear(), deload: { after: 10, factor: 0.5 } } })
+    openDeload()
+    act(() => stepper('Missed sessions in a row').querySelector('[aria-label="Decrease"]').click())
+    expect(onChange.mock.calls.at(-1)[0].deload).toEqual({ after: 9, factor: 0.5 })
+    act(() => stepper('Missed sessions in a row').querySelector('[aria-label="Increase"]').click())
+    expect(onChange.mock.calls.at(-1)[0].deload.after).toBe(10)   // a step past 10 stays at 10
+    act(() => stepper('Back off to (%)').querySelector('[aria-label="Increase"]').click())
+    expect(onChange.mock.calls.at(-1)[0].deload).toEqual({ after: 10, factor: 0.55 })
+  })
+  it('is offered only where a session can fall short of the plan', () => {
+    render({ rule: ruleOf('manual') })
+    expect(host.textContent).not.toContain('Back off when stuck')
+    render({ rule: ruleOf('hold_seconds') })
+    expect(host.textContent).toContain('Back off when stuck')
+  })
+})
+
 describe('RuleEditor', () => {
   it('switching the load to % 1RM also switches the increment to percentage points', () => {
     const onChange = render({ rule: linear() })

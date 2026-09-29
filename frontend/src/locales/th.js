@@ -1783,5 +1783,13 @@ export default {
   'Seconds added per step': 'วินาทีที่เพิ่มต่อขั้น',
   'Apply RPT': 'ใช้ RPT',
   'Same reps every set': 'จำนวนครั้งเท่ากันทุกเซ็ต',
-  'Load only goes up if your hardest set left at least this many reps in reserve.': 'น้ำหนักจะเพิ่มก็ต่อเมื่อเซ็ตที่หนักที่สุดของคุณเหลือรีพสำรองอย่างน้อยเท่านี้'
+  'Load only goes up if your hardest set left at least this many reps in reserve.': 'น้ำหนักจะเพิ่มก็ต่อเมื่อเซ็ตที่หนักที่สุดของคุณเหลือรีพสำรองอย่างน้อยเท่านี้',
+  // --- deload: the load backs off after repeated misses ---
+  'Back off when stuck': 'ลดน้ำหนักเมื่อติดขัด',
+  'Back off after repeated misses': 'ลดน้ำหนักหลังพลาดซ้ำ ๆ',
+  'Missed sessions in a row': 'เซสชันที่พลาดติดต่อกัน',
+  'Back off to (%)': 'ลดเหลือ (%)',
+  'after {0} · to {1}%': 'หลัง {0} · เหลือ {1}%',
+  'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'เมื่อทำไม่ถึงแผนด้วยน้ำหนักเดิมครบจำนวนเซสชันนี้ น้ำหนักจะลดลงแล้วค่อย ๆ เพิ่มใหม่',
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'ลดน้ำหนักหลังทำไม่ถึงแผน {0} เซสชัน: {1} → {2} {3}.'
 }

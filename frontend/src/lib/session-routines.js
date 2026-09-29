@@ -1,5 +1,5 @@
 import { uid } from './format.js'
-import { defaultPlanRule } from './prescription/index.js'
+import { cardioParameters, defaultPlanRule } from './prescription/index.js'
 import { isBodyweightEq, isCardio } from './exercises.js'
 import { workLoadOf } from './finish-session.js'
 
@@ -47,7 +47,9 @@ function copiedOccurrence(exposure, source, unit) {
   if (isCardio(exerciseId)) {
     const minutes = rows.reduce((sum, row) => sum + (observation(row, 'duration') || 0), 0) / 60 / rows.length
     const speed = rows.reduce((sum, row) => sum + (observation(row, 'speed') || 0), 0) / rows.length
-    return { occurrenceId, exerciseId, rule, cardio: { sets: rows.length, min: Math.max(1, Math.round(minutes)), speed: speed || 8 }, ...(sg ? { sg } : {}) }
+    const cardio = { sets: rows.length, min: Math.max(1, Math.round(minutes)), speed: speed || 8 }
+    rule.parameters = { ...rule.parameters, ...cardioParameters(cardio) }
+    return { occurrenceId, exerciseId, mode: 'cardio', rule, cardio, ...(sg ? { sg } : {}) }
   }
   rule.parameters.sets = range(rows.length)
   if (preset === 'hold_seconds') {

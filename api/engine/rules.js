@@ -2,10 +2,15 @@
 // configuration is strict: an invalid rule cannot be saved or generated from. Athlete execution is
 // never validated here — see audit.js.
 
+import { DELOAD_FACTOR_MAX, DELOAD_FACTOR_MIN, defaultDeload, isValidDeloadFactor } from './deload.js'
+
 export const INCREMENT_TYPES = ['absolute', 'current_load_percent', 'snapshot_1rm_percent', 'target_load_percent', 'percentage_points', 'seconds']
 export const COMPLETION_METRICS = ['target_load', 'max_sets', 'max_reps', 'max_duration', 'cycle_count', 'training_max', 'difficulty_rung']
 // The gates that advance the load expression. 'rung' advances a ladder position instead.
 export const INCREMENTING_GATES = ['hit', 'max_reps', 'max_sets_reps']
+// The gates whose "not even the minimum" sessions count as stalls (advance.js): the ones that
+// can also run a deload. A hold's seconds window slides, so it backs off by sliding back.
+export const DELOAD_GATES = ['hit', 'max_reps', 'max_sets_reps', 'seconds']
 
 const STRENGTH = ['target_load', 'max_sets', 'max_reps']
 // ranges: per field, whether the plan may give it as a range — 'fixed' (one value, min === max),
@@ -30,14 +35,16 @@ export const PRESETS = {
 export const PRESET_IDS = Object.keys(PRESETS)
 
 // The v1 policies each logging mode accepted and the preset that is their exact equivalent.
-// Shared by the v1 → v2 migration and the Coach, which still speaks in v1 policies.
+// Shared by the v1 → v2 migration and the Coach, which still speaks in v1 policies. v1's "Add
+// time" grew the target seconds after a clean session, which is what hold_seconds does; `duration`
+// is the v2 preset where you set the seconds yourself, i.e. v1's timed "no progression".
 const POLICY_BY_MODE = { reps: ['linear', 'greyskull', 'double'], time: ['time'], cardio: [] }
 export function presetForPolicy(prog, mode, bodyweight) {
   if (!POLICY_BY_MODE[mode]?.includes(prog)) return 'manual'
-  if (prog === 'time') return 'duration'
+  if (prog === 'time') return 'hold_seconds'
   return prog === 'linear' && bodyweight ? 'bodyweight_ladder' : prog
 }
-const POLICY_OF = { linear: 'linear', greyskull: 'greyskull', double: 'double', bodyweight_ladder: 'linear', duration: 'time', manual: 'off' }
+const POLICY_OF = { linear: 'linear', greyskull: 'greyskull', double: 'double', bodyweight_ladder: 'linear', hold_seconds: 'time', duration: 'off', manual: 'off' }
 /** The v1 policy a preset reads as, or null when it has no v1 equivalent. */
 export const policyOfPreset = preset => POLICY_OF[preset] ?? null
 
@@ -73,6 +80,9 @@ export function defaultPlanRule(preset, { id, exerciseId, routineId = null, unit
     special: {}
   }
   const p = rule.parameters
+  // v1 backed every progressing policy off after a run of misses; a new rule starts the same way.
+  const deload = defaultDeload(preset)
+  if (deload) rule.deload = deload
   if (preset === 'linear' || preset === 'greyskull') Object.assign(p, { reps: range(5), restSeconds: 180 })
   if (preset === 'autoregulated') Object.assign(p, { reps: range(8, 12), rir: range(1, 3) })
   if (preset === 'double') Object.assign(p, { reps: range(8, 12), restSeconds: 120 })
@@ -103,6 +113,11 @@ export function defaultPlanRule(preset, { id, exerciseId, routineId = null, unit
   }
   return rule
 }
+
+/** A cardio plan — v1's `{ sets, min, speed }`: intervals of `min` minutes, at `speed` km/h when given. */
+export const cardioParameters = ({ sets, min, speed }) => ({
+  sets: range(sets), reps: range(1), durationSeconds: range(min * 60), ...(speed > 0 ? { speed } : {})
+})
 
 /** True when generating from this rule needs the exercise's 1RM. */
 export const needsOneRm = rule =>
@@ -190,6 +205,16 @@ function checkSpecial(errors, rule) {
   }
 }
 
+// After `after` sessions in a row short of the plan, at the same load, the load backs off by
+// `factor` (deload.js). Only a preset that judges sessions can stall.
+function checkDeload(errors, rule, def) {
+  const d = rule.deload
+  if (!isObj(d) || Object.keys(d).sort().join() !== 'after,factor') { errors.push('deload must be { after, factor }'); return }
+  if (!DELOAD_GATES.includes(def.gate)) errors.push(`${rule.preset} does not deload`)
+  if (!(Number.isInteger(d.after) && d.after >= 1 && d.after <= 10)) errors.push('deload.after must be a whole number of sessions from 1 to 10')
+  if (!isValidDeloadFactor(d.factor)) errors.push(`deload.factor must be between ${DELOAD_FACTOR_MIN} and ${DELOAD_FACTOR_MAX}`)
+}
+
 export function validatePlanRule(rule) {
   const def = PRESETS[rule?.preset]
   if (!def) return { ok: false, errors: [`preset "${rule?.preset}" is not a preset`] }
@@ -244,6 +269,11 @@ export function validatePlanRule(rule) {
 
   checkRounding(errors, rule.rounding)
   if (['duration', 'hold_seconds'].includes(rule.preset) && !p.durationSeconds) errors.push(`${rule.preset} needs parameters.durationSeconds`)
+  if (p.speed !== undefined) {
+    if (!(finite(p.speed) && p.speed > 0)) errors.push('parameters.speed must be a number > 0')
+    else if (!p.durationSeconds) errors.push('parameters.speed needs parameters.durationSeconds')
+  }
+  if (rule.deload !== undefined) checkDeload(errors, rule, def)
   checkSpecial(errors, rule)
   return { ok: errors.length === 0, errors }
 }

@@ -1772,5 +1772,13 @@ export default {
   'Seconds added per step': 'प्रति चरण जोड़े गए सेकंड',
   'Apply RPT': 'RPT लागू करें',
   'Same reps every set': 'हर सेट में समान रेप्स',
-  'Load only goes up if your hardest set left at least this many reps in reserve.': 'वज़न तभी बढ़ता है जब आपके सबसे कठिन सेट में कम से कम इतने रेप्स रिज़र्व में बचे हों।'
+  'Load only goes up if your hardest set left at least this many reps in reserve.': 'वज़न तभी बढ़ता है जब आपके सबसे कठिन सेट में कम से कम इतने रेप्स रिज़र्व में बचे हों।',
+  // --- deload: the load backs off after repeated misses ---
+  'Back off when stuck': 'अटकने पर वज़न घटाएँ',
+  'Back off after repeated misses': 'बार-बार विफल होने पर वज़न घटाएँ',
+  'Missed sessions in a row': 'लगातार छूटे सत्र',
+  'Back off to (%)': 'घटाकर (%) करें',
+  'after {0} · to {1}%': '{0} के बाद · {1}% तक',
+  'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'एक ही वज़न पर योजना से कम रहने वाले इतने सत्रों के बाद वज़न घटता है और फिर से बढ़ता है।',
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'योजना से कम रहे {0} सत्रों के बाद वज़न घटाया गया: {1} → {2} {3}.'
 }

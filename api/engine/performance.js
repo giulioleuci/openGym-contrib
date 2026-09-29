@@ -21,10 +21,14 @@ function legacySet(row, mode) {
 }
 
 function targetOf(exposure, p) {
-  if (!p) return null
+  // A migrated v1 entry no prescription could hold keeps what v1 prescribed for it (migration).
+  if (!p) return exposure.legacyTarget ? { ...exposure.legacyTarget } : null
+  // v1's cardio target is minutes and speed; a hold's is seconds.
+  const duration = p.prefill.durationSeconds == null ? {}
+    : exposure.mode === 'cardio' ? { min: p.prefill.durationSeconds / 60, ...(p.prefill.speed != null ? { speed: p.prefill.speed } : {}) }
+      : { sec: p.prefill.durationSeconds }
   return {
-    mode: exposure.mode || 'reps', sets: p.rows.length, reps: p.prefill.reps,
-    ...(p.prefill.durationSeconds != null ? { sec: p.prefill.durationSeconds } : {}),
+    mode: exposure.mode || 'reps', sets: p.rows.length, reps: p.prefill.reps, ...duration,
     ...(p.parameters.load.resolved ? { weight: p.parameters.load.resolved.value } : {})
   }
 }

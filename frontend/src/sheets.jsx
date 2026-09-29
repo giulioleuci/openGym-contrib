@@ -46,7 +46,7 @@ import { buildCombinedExposures, deriveSessionName } from './lib/session-merge.j
 import { entriesForExposures, planSummary } from './lib/session-ui-adapter.js'
 import { editCompletedSession, editChangesNothing, editLeftEmpty, editedRecord } from './lib/session-edit.js'
 import { workoutsOn, backfillStart, backfillEnd, completeBackfill, historyAsOf, sessionHistory } from './lib/backfill.js'
-import { legacyEntriesOf, appendOneRm, canonicalJSON, defaultPlanRule, planWarmupRows, supports, validatePlanRule, validateWarmup, warmupMaxCount, warmupSteps } from './lib/prescription/index.js'
+import { legacyEntriesOf, appendOneRm, canonicalJSON, cardioParameters, defaultPlanRule, planWarmupRows, supports, validatePlanRule, validateWarmup, warmupMaxCount, warmupSteps } from './lib/prescription/index.js'
 import RuleEditor, { Disclosure, PRESET_LABEL } from './components/RuleEditor.jsx'
 import { auditFields, badgeFor } from './views/history-outcome.js'
 import { findingText } from './lib/progression-copy.js'
@@ -1311,6 +1311,10 @@ export function defaultRuleFor(ex, routine, unit) {
   return defaultPlanRule(preset, { id: uid(), exerciseId: ex.id, routineId: routine?.id ?? null, unit })
 }
 
+// The cardio sheet's numbers, read back off a rule that already holds them.
+const cardioOf = rule => (rule?.parameters.durationSeconds
+  ? { sets: rule.parameters.sets.min, min: rule.parameters.durationSeconds.min / 60, speed: rule.parameters.speed ?? 8 } : null)
+
 export function occurrenceSummary(occ) {
   const r = occ?.rule
   if (!r) return t('Needs setup')
@@ -1363,7 +1367,7 @@ function ExConfig({ ex, existing, onSave, onDelete, onReplace, close, routine, s
   const [rule, setRule] = useState(() => (existing?.rule ? cloneJSON(existing.rule) : defaultRuleFor(ex, routine, st.unit)))
   const [note, setNote] = useState(() => existing?.note || '')
   const speedUnit = speedUnitOf(st)
-  const [cardioCfg, setCardioCfg] = useState(() => existing?.cardio || { sets: 4, min: 20, speed: 8 })
+  const [cardioCfg, setCardioCfg] = useState(() => existing?.cardio || cardioOf(existing?.rule) || { sets: 4, min: 20, speed: 8 })
   const [intensifierRaw, setIntensifier] = useState(() => existing?.intensifier || null)
   const [warmupRaw, setWarmup] = useState(() => existing?.warmup || { mode: 'off' })
   const [sideRaw, setSide] = useState(() => existing?.side === true)
@@ -1382,16 +1386,19 @@ function ExConfig({ ex, existing, onSave, onDelete, onReplace, close, routine, s
     if (!valid) return
     close()
     const before = existing?.rule
+    // A cardio interval is the rule's duration and speed: the engine builds the session rows from it.
+    const cardioPlan = cardio ? {
+      sets: Math.max(1, Math.round(cardioCfg.sets) || 1),
+      min: Math.max(1, Math.round(cardioCfg.min) || 20),
+      speed: Math.max(0, cardioCfg.speed || 8),
+    } : null
+    const planned = cardio ? { ...rule, parameters: { ...rule.parameters, ...cardioParameters(cardioPlan) } } : rule
     // Any edit is an explicit plan edit: a new revision, which is what reopens a completed track.
-    const revision = before && canonicalJSON(before) !== canonicalJSON(rule) ? before.revision + 1 : rule.revision
+    const revision = before && canonicalJSON(before) !== canonicalJSON(planned) ? before.revision + 1 : planned.revision
     const trimmedNote = (note || '').trim().slice(0, 500)
     onSave({
-      occurrenceId, exerciseId: ex.id, rule: { ...rule, revision },
-      ...(cardio ? { cardio: {
-        sets: Math.max(1, Math.round(cardioCfg.sets) || 1),
-        min: Math.max(1, Math.round(cardioCfg.min) || 20),
-        speed: Math.max(0, cardioCfg.speed || 8),
-      } } : {}),
+      occurrenceId, exerciseId: ex.id, rule: { ...planned, revision },
+      ...(cardio ? { mode: 'cardio', cardio: cardioPlan } : {}),
       ...(!cardio && warmup.mode !== 'off' ? { warmup } : {}),
       ...(!cardio && intensifier?.type ? { intensifier: intensifierToSave(intensifier) } : {}),
       ...(side ? { side: true } : {}),

@@ -19,7 +19,7 @@
 import { ENGINE_SCHEMA, migrationStatus } from './profile-version.js';
 import {
   INCREMENTING_GATES, PRESETS, advanceProgression, currentOneRm, defaultPlanRule, estimate1RM,
-  generatePrescription, migrateOccurrence, normalizeEffort, planFingerprint, presetForPolicy, summarizeActual, validateIntensifier, validatePlanRule, validateWarmup
+  generatePrescription, isValidDeloadFactor, migrateOccurrence, normalizeEffort, planFingerprint, presetForPolicy, summarizeActual, validateIntensifier, validatePlanRule, validateWarmup
 } from '../engine/index.js';
 
 export { ENGINE_SCHEMA, isLegacyProfile, migrationStatus } from './profile-version.js';
@@ -74,6 +74,17 @@ function stepFor(loads, inc, unit) {
   return [...(inc > 0 ? [inc] : []), ...STEPS[unit]].find(step => loads.every(v => onGrid(v, step))) ?? 0.001;
 }
 
+// v1 progression.js defaultIncrement/weightIncrement: an exercise's own `inc`, else its body part's
+// default — lower-body and back work takes the bigger jump. On a timed hold `inc` is seconds
+// (DEFAULT_SEC_INCREMENT); cardio has none.
+const HEAVY_BP = new Set(['upper legs', 'lower legs', 'back', 'hips', 'glutes']);
+function incrementOf(cfg, info, mode, unit) {
+  if (mode === 'cardio') return null;
+  if (num(cfg.inc) > 0) return num(cfg.inc);
+  if (mode === 'time') return 5;
+  return HEAVY_BP.has(info?.bp) ? (unit === 'lb' ? 10 : 5) : (unit === 'lb' ? 5 : 2.5);
+}
+
 // v1 progression.js MAX_BW_SETS: where a bodyweight climb stops adding sets.
 const MAX_BW_SETS = 6;
 
@@ -90,7 +101,7 @@ function doubleRange(v) {
 
 /** A canonical rule from plain v1 numbers — a routine entry, or that entry with a logged target
  *  over it. `reps`: the exact rep window, for a logged day whose window is not the plan's. */
-function ruleFrom(v, { id, routineId, exerciseId, preset, unit, mode, step, rest, reps: window }) {
+function ruleFrom(v, { id, routineId, exerciseId, preset, unit, mode, step, rest, inc, reps: window }) {
   const rule = defaultPlanRule(preset, { id, exerciseId, routineId, unit });
   const p = rule.parameters;
   const sets = whole(v.sets);
@@ -109,13 +120,22 @@ function ruleFrom(v, { id, routineId, exerciseId, preset, unit, mode, step, rest
   } else {
     const seconds = mode === 'cardio' ? (num(v.min) > 0 ? num(v.min) * 60 : 20 * 60) : (num(v.sec) > 0 ? num(v.sec) : 30);
     Object.assign(p, { reps: fixed(1), durationSeconds: fixed(seconds) });
+    // The interval's target speed (km/h); a cardio row with none opened at 8 in v1.
+    if (mode === 'cardio') p.speed = num(v.speed) > 0 ? num(v.speed) : 8;
   }
   const w = num(v.weight);
   const loaded = INCREMENTING_GATES.includes(PRESETS[preset].gate);
   p.load = w > 0 || loaded ? { mode: 'absolute', value: w > 0 ? w : 0, unit } : { mode: 'empty' };
   p.restSeconds = whole(v.restSec ?? v.rest, 0) ?? rest ?? p.restSeconds;
-  const inc = num(v.inc);
-  if (inc != null && inc >= 0) rule.increment = { type: 'absolute', value: inc, unit };
+  // v1's default step (incrementOf) only matters where the rule steps by itself; a step the lifter
+  // typed is kept wherever it was.
+  if (inc > 0 && (loaded || preset === 'hold_seconds' || num(v.inc) > 0)) {
+    rule.increment = preset === 'hold_seconds' ? { type: 'seconds', value: inc } : { type: 'absolute', value: inc, unit };
+  }
+  // Only linear and double progression ever read `deloadFactor` (v1's Epley deload); Greyskull and
+  // a timed hold always backed off by the 10 % default, which is what the rule starts with.
+  const factor = num(v.deloadFactor);
+  if (rule.deload && (preset === 'linear' || preset === 'double') && isValidDeloadFactor(factor)) rule.deload = { after: rule.deload.after, factor };
   // v1 never had a terminal target: a migrated track keeps progressing, it never "completes".
   Object.assign(rule, { target: { mode: 'none' }, completion: [], rounding: { mode: 'nearest', step } });
   return rule;
@@ -135,13 +155,11 @@ function v1PlannedOf(cfg, mode) {
 }
 const samePlanV1 = (a, b) => PLAN_KEYS.every(k => (a[k] ?? null) === (b[k] ?? null));
 
-// Fields with no executable equivalent in the v2 engine. Kept verbatim in migrationAudit and shown
-// as "needs review"; the immutable v1 backup holds everything else.
-const UNSUPPORTED = ['deloadFactor'];
+// What the v2 engine cannot run is kept verbatim in migrationAudit and shown as "needs review"; the
+// immutable v1 backup holds everything else. A progression rule the engine does not know is the
+// one thing left over here — `deloadFactor` and cardio `speed` now have rule fields of their own.
 function noteUnsupported(d, out) {
   const at = { routineId: d.routineId, occurrenceId: d.occurrenceId, exerciseId: d.exerciseId };
-  for (const field of UNSUPPORTED) if (d.cfg[field] != null && d.cfg[field] !== false) out.push({ ...at, field, value: clone(d.cfg[field]) });
-  if (d.mode === 'cardio' && d.cfg.speed != null) out.push({ ...at, field: 'speed', value: d.cfg.speed });
   if (d.preset === 'manual' && typeof d.cfg.prog === 'string' && d.cfg.prog && d.cfg.prog !== 'off') out.push({ ...at, field: 'prog', value: d.cfg.prog });
 }
 
@@ -185,11 +203,13 @@ const occurrenceOf = d => ({
   ...(d.cfg.side === true && d.mode === 'reps' ? { side: true } : {}),
   // Only where it overrides the catalogue, the way v1 wrote it.
   ...(d.mode !== 'cardio' && d.cfg.bodyweight != null && !!d.cfg.bodyweight !== BODYWEIGHT_EQ.has(d.info?.eq) ? { bodyweight: !!d.cfg.bodyweight } : {}),
-  ...(d.intensifier ? { intensifier: d.intensifier } : {})
+  ...(d.intensifier ? { intensifier: d.intensifier } : {}),
+  // What the cardio sheet edits (sheets.jsx): the rule holds the same numbers for the engine.
+  ...(d.mode === 'cardio' ? { cardio: { sets: d.rule.parameters.sets.min, min: d.rule.parameters.durationSeconds.min / 60, speed: d.rule.parameters.speed } } : {})
 });
 
 /* ---------- history ---------- */
-const TARGET = ['sets', 'reps', 'repsMin', 'repsMax', 'weight', 'sec', 'min'];
+const TARGET = ['sets', 'reps', 'repsMin', 'repsMax', 'weight', 'sec', 'min', 'speed'];
 const targetValues = t => Object.fromEntries(TARGET.filter(k => t?.[k] != null).map(k => [k, t[k]]));
 
 /** The one occurrence a logged entry was prescribed from, or null when that is not certain. */
@@ -207,12 +227,14 @@ function linkOf(w, entry, byRoutine) {
 // starts where the newest of them left off (spec "Conservative progression").
 function finalizeDraft(d, ctx) {
   const loads = [d.cfg.weight, ...d.links.map(l => l.values.weight)].map(num).filter(v => v > 0);
-  d.step = stepFor(loads, num(d.cfg.inc), ctx.unit);
+  d.inc = incrementOf(d.cfg, d.info, d.mode, ctx.unit);
+  // The rounding step is a load step; a timed hold's `inc` is seconds.
+  d.step = stepFor(loads, d.mode === 'reps' ? d.inc : null, ctx.unit);
   // v1 climbed reps, not load, where nothing is loaded and the equipment is no load of its own.
   if (d.preset === 'linear' && !loads.length && !LOADED_EQ.has(d.info?.eq)) d.preset = 'bodyweight_ladder';
   d.ruleFor = (values, step = d.step, reps) => ruleFrom({ ...d.cfg, ...values }, {
     id: `rule:${d.occurrenceId}`, routineId: d.routineId, exerciseId: d.exerciseId,
-    preset: d.preset, unit: ctx.unit, mode: d.mode, step, rest: ctx.rest, reps
+    preset: d.preset, unit: ctx.unit, mode: d.mode, step, rest: ctx.rest, inc: d.inc, reps
   });
   // What a logged double-progression day asked for: the climb's aim (target.reps) up to the plan's
   // top of range, so the "top of the range in every set" gate of advance.js reads it as v1 did.
@@ -239,11 +261,15 @@ function finalizeDraft(d, ctx) {
   const last = d.links.at(-1)?.values;
   d.rule = d.ruleFor({
     ...(last?.weight != null ? { weight: last.weight } : {}),
-    ...(d.preset === 'duration' && last?.sec != null ? { sec: last.sec } : {})
+    ...(d.preset === 'hold_seconds' && last?.sec != null ? { sec: last.sec } : {})
   });
   const check = validatePlanRule(d.rule);
   if (!check.ok) throw new Error(`invalid-rule ${d.occurrenceId}: ${check.errors[0]}`);
   d.warmup = migrateOccurrence({ warmupSets: d.cfg.warmupSets }).warmup;
+  // A factor set on an exercise whose rule cannot back off (no progression, or a ladder) has nothing to act on.
+  if (d.cfg.deloadFactor != null && d.cfg.deloadFactor !== false && !d.rule.deload) {
+    ctx.unsupported.push({ routineId: d.routineId, occurrenceId: d.occurrenceId, exerciseId: d.exerciseId, field: 'deloadFactor', value: clone(d.cfg.deloadFactor) });
+  }
   d.intensifier = intensifierOf(d.cfg.intensifier, d.rule);
   // One the rule cannot run (a preset that shapes its own rows, a timed or unloaded rule) is audited instead.
   if (d.cfg.intensifier != null && d.cfg.intensifier !== false && !d.intensifier) {
@@ -323,7 +349,13 @@ function migrateWorkout(w, i, ctx) {
       // Canonical legacy history: visible to every reader, never an engine success or failure.
       ...(link
         ? { occurrenceId: link.d.occurrenceId, trackId: link.d.occurrenceId, prescriptionId: link.prescription.id, excludedFromProgression: false }
-        : { kind: 'legacy', trackId: null, prescriptionId: null, excludedFromProgression: true }),
+        // What v1 prescribed for the entry stays with it, verbatim: no prescription can hold it,
+        // and the readers of the v1 entry shape (performance.js legacyEntriesOf) take it from here.
+        : {
+          kind: 'legacy', trackId: null, prescriptionId: null, excludedFromProgression: true,
+          ...(isObj(entry.target) ? { legacyTarget: clone(entry.target) } : {}),
+          ...(isObj(entry.planned) ? { legacyPlanned: clone(entry.planned) } : {})
+        }),
       ...(entry.sg ? { sg: entry.sg } : {}),
       ...(isObj(entry.muscleSnapshot) ? { muscleSnapshot: clone(entry.muscleSnapshot) } : {}),
       performance: {
@@ -347,15 +379,23 @@ function migrateWorkout(w, i, ctx) {
   };
 }
 
-// Seeded from the newest linked exposure alone: its gate decides one earned increment; no failure
-// streak or deload is read back out of older history.
+// A track's state is what its linked sessions leave it, oldest to newest, as each finish advanced
+// it: the newest one's gate decides one earned increment, and the run of misses at one load that v1
+// recomputed from history on every read (stallCount) is counted here so a deload comes when v1's
+// would have. An edit of the plan between two sessions ends the run, as it did in v1.
 function seedProgression(state, drafts, workouts) {
   const progression = isObj(state.progression) ? clone(state.progression) : {};
   for (const d of drafts) {
-    const last = d.links.at(-1);
-    if (!last) continue;
-    const x = workouts[last.i].exposures.find(e => e.exposureId === `${last.workoutId}:x${last.j}`);
-    progression[d.occurrenceId] = advanceProgression({ state: null, prescription: last.prescription, log: { id: x.exposureId, actual: x.actual }, now: x.completedAt });
+    let track = null;
+    let before = null;
+    for (const link of d.links) {
+      const x = workouts[link.i].exposures.find(e => e.exposureId === `${link.workoutId}:x${link.j}`);
+      const p = link.prescription;
+      if (before?.planFingerprint && p.planFingerprint && before.planFingerprint !== p.planFingerprint) track = null;
+      track = advanceProgression({ state: track, prescription: p, log: { id: x.exposureId, actual: x.actual }, now: x.completedAt });
+      before = p;
+    }
+    if (track) progression[d.occurrenceId] = track;
   }
   return progression;
 }

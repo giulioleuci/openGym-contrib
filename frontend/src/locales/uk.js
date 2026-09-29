@@ -1753,5 +1753,13 @@ export default {
   'Seconds added per step': 'Секунд додається за крок',
   'Apply RPT': 'Застосувати RPT',
   'Same reps every set': 'Однакові повторення в кожному підході',
-  'Load only goes up if your hardest set left at least this many reps in reserve.': 'Навантаження зростає лише якщо у найважчому підході залишилося щонайменше стільки повторень у запасі.'
+  'Load only goes up if your hardest set left at least this many reps in reserve.': 'Навантаження зростає лише якщо у найважчому підході залишилося щонайменше стільки повторень у запасі.',
+  // --- deload: the load backs off after repeated misses ---
+  'Back off when stuck': 'Знижувати навантаження при застої',
+  'Back off after repeated misses': 'Знижувати після повторних невдач',
+  'Missed sessions in a row': 'Невдалих тренувань поспіль',
+  'Back off to (%)': 'Знизити до (%)',
+  'after {0} · to {1}%': 'після {0} · до {1}%',
+  'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'Якщо стільки тренувань поспіль з тією самою вагою не дотягнули до плану, вага знижується і знову зростає.',
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Вагу знижено після {0} тренувань нижче плану: {1} → {2} {3}.'
 }

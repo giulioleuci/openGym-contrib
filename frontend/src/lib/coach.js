@@ -464,7 +464,7 @@ const CHANGE_APPLY = {
     const r = need(findRoutine(s, c.target.routineId))
     const a = c.after || {}
     const view = { id: a.id, sets: a.sets || 3, mode: a.mode || 'reps', prog: a.prog, weight: a.weight, repsMin: a.repsMin, repsMax: a.repsMax }
-    if (view.mode === 'cardio') view.min = a.min || 20
+    if (view.mode === 'cardio') { view.min = a.min || 20; if (a.speed > 0) view.speed = a.speed }
     else if (view.mode === 'time') view.sec = a.sec || 45
     else view.reps = a.reps || 10
     const at = Number.isInteger(a.position) ? Math.min(a.position, r.ex.length) : r.ex.length
@@ -488,8 +488,7 @@ const CHANGE_APPLY = {
   repsMin: (s, c) => edit(s, c, v => { v.repsMin = c.after }),
   repsMax: (s, c) => edit(s, c, v => { v.repsMax = c.after }),
   sec: (s, c) => edit(s, c, v => { v.sec = c.after }),
-  // ponytail: `speed` has no rule field and is dropped; add one to the rule if cardio speed matters.
-  cardio: (s, c) => edit(s, c, v => { if (c.after?.min != null) v.min = c.after.min }),
+  cardio: (s, c) => edit(s, c, v => { if (c.after?.min != null) v.min = c.after.min; if (c.after?.speed > 0) v.speed = c.after.speed }),
   inc: (s, c) => edit(s, c, v => { v.inc = c.after }),
   'exercise-prog': (s, c) => edit(s, c, v => { v.prog = c.after }),
   'routine-prog': (s, c) => {

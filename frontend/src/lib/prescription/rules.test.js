@@ -160,7 +160,7 @@ describe('v1 policy ↔ preset', () => {
     expect(presetForPolicy('linear', 'reps', true)).toBe('bodyweight_ladder')
     expect(presetForPolicy('greyskull', 'reps', false)).toBe('greyskull')
     expect(presetForPolicy('double', 'reps', false)).toBe('double')
-    expect(presetForPolicy('time', 'time', false)).toBe('duration')
+    expect(presetForPolicy('time', 'time', false)).toBe('hold_seconds')   // v1's "Add time" grew the seconds by itself
     expect(presetForPolicy('time', 'reps', false)).toBe('manual')
     expect(presetForPolicy('off', 'reps', false)).toBe('manual')
     expect(presetForPolicy(undefined, 'cardio', false)).toBe('manual')
@@ -168,9 +168,10 @@ describe('v1 policy ↔ preset', () => {
   it('reads a preset back as the policy the Coach knows, null when there is none', () => {
     expect(['linear', 'greyskull', 'double'].map(policyOfPreset)).toEqual(['linear', 'greyskull', 'double'])
     expect(policyOfPreset('bodyweight_ladder')).toBe('linear')
-    expect(policyOfPreset('duration')).toBe('time')
+    expect(policyOfPreset('hold_seconds')).toBe('time')
+    expect(policyOfPreset('duration')).toBe('off')   // you set the seconds yourself
     expect(policyOfPreset('manual')).toBe('off')
-    for (const p of ['triple', 'pyramid', 'reverse_pyramid', 'five_three_one', 'autoregulated', 'hold_seconds']) expect(policyOfPreset(p)).toBe(null)
+    for (const p of ['triple', 'pyramid', 'reverse_pyramid', 'five_three_one', 'autoregulated']) expect(policyOfPreset(p)).toBe(null)
   })
 })
 

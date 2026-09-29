@@ -1167,6 +1167,15 @@ describe('lastEntryFor skips a noProg entry', () => {
     expect(lastEntryFor(S, LIFT2)).toMatchObject({ d: '2026-01-01', target: { reps: 8, weight: 60 }, sets: [{ w: 60, r: 8, done: true }] })
   })
 
+  it('an exposure migrated from v1 without a prescription gives back the target v1 recorded for it', () => {
+    const exposure = { exerciseId: LIFT2, mode: 'reps', prescriptionId: null, kind: 'legacy', excludedFromProgression: false, legacyTarget: { sets: 3, reps: 5, weight: 62.5, mode: 'reps' },
+      performance: { sets: [{ role: 'work', status: 'completed', observations: [{ metric: 'repetitions', value: 5 }], resistance: { kind: 'external-load', value: 62.5 }, segments: [] }] } }
+    const S = { prescriptions: {}, workouts: [{ d: '2026-01-01', exposures: [exposure] }] }
+    expect(lastEntryFor(S, LIFT2).target).toEqual({ sets: 3, reps: 5, weight: 62.5, mode: 'reps' })
+    delete exposure.legacyTarget
+    expect(lastEntryFor(S, LIFT2).target).toEqual({ mode: 'reps', sets: 1 })
+  })
+
   it('lastEntryFor returns the prior counting session, not a later noProg one', () => {
     const S = { workouts: [wk('2026-01-01', 60, 8), wk('2026-01-05', 30, 12, { noProg: true })] }
     expect(lastEntryFor(S, LIFT2).d).toBe('2026-01-01')

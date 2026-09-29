@@ -6,7 +6,7 @@ import Icon from './Icon.jsx'
 import Stepper from './Stepper.jsx'
 import { Button, Row, Segmented, SelectButton, SelectRow, Switch } from './ui.jsx'
 import { t } from '../lib/i18n.js'
-import { INCREMENT_TYPES, INCREMENTING_GATES, PRESETS, PRESET_IDS, defaultPlanRule, rptOffsets, validatePlanRule } from '../lib/prescription/index.js'
+import { DELOAD_GATES, INCREMENT_TYPES, INCREMENTING_GATES, PRESETS, PRESET_IDS, defaultDeload, defaultPlanRule, rptOffsets, validatePlanRule } from '../lib/prescription/index.js'
 
 export const PRESET_LABEL = {
   manual: 'Manual', autoregulated: 'Autoregulated', linear: 'Linear', greyskull: 'Greyskull LP',
@@ -181,6 +181,24 @@ export default function RuleEditor({ rule, unit, effort, onChange }) {
         </div>}
       </div>)}
     </Disclosure>
+
+    {DELOAD_GATES.includes(def.gate) && <Disclosure title={t('Back off when stuck')}
+      value={rule.deload ? t('after {0} · to {1}%', rule.deload.after, Math.round(rule.deload.factor * 100)) : t('None')}>
+      <Row title={t('Back off after repeated misses')}>
+        <Switch checked={!!rule.deload} onChange={on => { const { deload, ...rest } = rule; onChange(on ? { ...rest, deload: defaultDeload(rule.preset) ?? { after: 3, factor: 0.9 } } : rest) }} />
+      </Row>
+      {rule.deload && <>
+        <div className="row cfgrow">
+          <Stepper label={t('Missed sessions in a row')} value={rule.deload.after} step={1} decimal={false}
+            onChange={after => set({ deload: { ...rule.deload, after: Math.min(10, Math.max(1, after)) } })} />
+        </div>
+        <div className="row cfgrow">
+          <Stepper label={t('Back off to (%)')} value={Math.round(rule.deload.factor * 100)} step={5} unit="%" decimal={false}
+            onChange={pct => set({ deload: { ...rule.deload, factor: Math.min(95, Math.max(50, pct)) / 100 } })} />
+        </div>
+        <div className="small dim">{t('After this many sessions short of the plan at the same load, the load goes back down and builds up again.')}</div>
+      </>}
+    </Disclosure>}
 
     <h4 className="sec">{t('Target')}</h4>
     {rule.preset !== 'five_three_one' && <RangeField key={'sets' + rule.preset} label={t('Sets')} value={p.sets} policy={def.ranges.sets} onChange={sets => setParams({ sets })} />}

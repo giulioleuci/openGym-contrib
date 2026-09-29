@@ -13,7 +13,7 @@ import { registerCustom } from './exercises.js'
 import * as serverPayload from '../../../api/coach/core/payload.js'
 import { hashPlan as serverHashPlan } from '../../../api/coach/core/plan-hash.js'
 import { canonicalProfile, ruleOccurrence, loggedExposure } from './test-fixtures.js'
-import { coachExOf } from '../../../api/coach/core/plan-view.js'
+import { coachExOf, ruleFromView } from '../../../api/coach/core/plan-view.js'
 import { occurrenceFor } from './session-start.js'
 import { validatePlanRule } from './prescription/index.js'
 
@@ -719,9 +719,27 @@ describe('v2 profiles', () => {
     const legacy = { id: '0001', sets: 3 }
     expect(coachExOf(legacy)).toBe(legacy)
   })
-  it('reads a hold_seconds occurrence as off with its preset named', () => {
+  it('reads a hold_seconds occurrence as the time policy, with its seconds step as `inc`', () => {
     const occ = ruleOccurrence('0009', { occurrenceId: 'occ3', preset: 'hold_seconds' })
-    expect(coachExOf(occ)).toMatchObject({ id: '0009', mode: 'time', sec: 20, prog: 'off', preset: 'hold_seconds' })
+    expect(coachExOf(occ)).toMatchObject({ id: '0009', mode: 'time', sec: 20, prog: 'time', inc: 5 })
+    expect(coachExOf(occ)).not.toHaveProperty('preset')
+  })
+  it('a Coach view of a cardio occurrence carries its speed, and a speed change lands on the rule', () => {
+    const view = { id: '3220', mode: 'cardio', sets: 2, min: 25, speed: 9.5 }
+    const rule = ruleFromView(ruleOccurrence('3220', { preset: 'manual' }).rule, view, { unit: 'kg' })
+    expect(rule.parameters).toMatchObject({ sets: { min: 2, max: 2 }, durationSeconds: { min: 1500, max: 1500 }, speed: 9.5 })
+    expect(validatePlanRule(rule).ok).toBe(true)
+    expect(coachExOf({ occurrenceId: 'c', exerciseId: '3220', mode: 'cardio', rule })).toMatchObject({ mode: 'cardio', min: 25, speed: 9.5 })
+    expect(ruleFromView(rule, { ...view, speed: 11 }, { unit: 'kg' }).parameters.speed).toBe(11)
+  })
+  it('a Coach step on a timed hold is seconds, and moving an exercise to the time policy builds a valid hold', () => {
+    const hold = ruleOccurrence('0009', { preset: 'hold_seconds' }).rule
+    const stepped = ruleFromView(hold, { id: '0009', mode: 'time', sets: 3, sec: 20, inc: 10, prog: 'time' }, { unit: 'kg' })
+    expect(stepped.increment).toEqual({ type: 'seconds', value: 10 })
+    expect(validatePlanRule(stepped).ok).toBe(true)
+    const fromManual = ruleFromView(ruleOccurrence('0009', { preset: 'manual' }).rule, { id: '0009', mode: 'time', sets: 3, sec: 45, inc: 5, prog: 'time' }, { unit: 'kg' })
+    expect(fromManual).toMatchObject({ preset: 'hold_seconds', increment: { type: 'seconds', value: 5 }, parameters: { durationSeconds: { min: 45, max: 45 } } })
+    expect(validatePlanRule(fromManual).ok).toBe(true)
   })
   it('the review payload carries the plan and the logged sets', () => {
     const p = serverPayload.build(v2(), { handle: 'h'.repeat(16), kind: 'review' })

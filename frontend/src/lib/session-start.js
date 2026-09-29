@@ -2,6 +2,14 @@
 // only gathers its inputs (rule, track state, newest log, current 1RM) and stores its output.
 import { currentOneRm, defaultPlanRule, generatePrescription, needsOneRm, resolveProgressionContext, supports } from './prescription/index.js'
 import { EXIDX, isAssisted } from './exercises.js'
+import { modeOf } from './history.js'
+
+// How the exercise is logged: the occurrence's own mode, else the catalogue's (a cardio exercise);
+// a rule with a duration and no reps is a hold.
+const modeFor = (occ, p) => {
+  const mode = modeOf({ mode: occ.mode, id: occ.exerciseId })
+  return mode === 'reps' && p.parameters.durationSeconds ? 'time' : mode
+}
 
 /** Exercises in these routines whose rule needs a 1RM the profile does not have yet. */
 export function missingOneRms(profile, routines) {
@@ -45,12 +53,14 @@ export function buildSessionExposures(profile, routine, ctx) {
       oneRm: currentOneRm(profile.oneRepMaxes, occ.exerciseId),
       // Lighter is harder on an assisted machine: a percentage ramp would run backwards.
       warmup: isAssisted(occ.exerciseId) ? null : occ.warmup ?? null,
-      equipment: EXIDX[occ.exerciseId]?.eq ?? null
+      equipment: EXIDX[occ.exerciseId]?.eq ?? null,
+      // What a deload needs to know about the movement (deload.js).
+      perSide: occ.side === true, restPause: occ.intensifier?.type === 'restpause'
     })
     profile.prescriptions[prescription.id] = prescription
     return {
       exposureId: ctx.newId(`exposure:${routine.id}:${occ.occurrenceId}:${ctx.now}:${i}`),
-      exerciseId: occ.exerciseId, exerciseNameSnapshot: occ.exerciseName || occ.exerciseId,
+      exerciseId: occ.exerciseId, exerciseNameSnapshot: occ.exerciseName || occ.exerciseId, mode: modeFor(occ, prescription),
       routineId: routine.id, occurrenceId: occ.occurrenceId, trackId,
       excludedFromProgression: routine.excludeFromProgression === true || occ.excludeFromProgression === true,
       prescriptionId: prescription.id,

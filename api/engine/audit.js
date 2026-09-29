@@ -63,6 +63,7 @@ export function summarizeActual(prescription, performed) {
   const least = values => { const vs = values.filter(Number.isFinite); return vs.length ? Math.min(...vs) : null }
   const loads = deciding.map(s => s.load).filter(l => Number.isFinite(l?.value))
   const durationSeconds = least(deciding.map(s => s.durationSeconds))
+  const speed = least(deciding.map(s => s.speed))
   const rir = least(deciding.map(s => normalizeEffort(s).rir))
   const rpes = deciding.map(s => s.rpeEntered).filter(Number.isFinite)
   return {
@@ -70,6 +71,7 @@ export function summarizeActual(prescription, performed) {
     reps: least(deciding.map(s => s.reps)),
     load: loads.length ? { ...loads.reduce((a, b) => (b.value < a.value ? b : a)) } : null,
     ...(durationSeconds != null ? { durationSeconds } : {}),
+    ...(speed != null ? { speed } : {}),
     ...(rir != null ? { rir } : {}),
     ...(rpes.length ? { rpeEntered: Math.max(...rpes) } : {})
   }

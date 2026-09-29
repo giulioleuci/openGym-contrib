@@ -323,7 +323,14 @@ function lastEntryIn(S, exId, rid) {
     // none — modeOf() falls back to the body part for them, which is what they were.
     if (done.length) {
       const p = S.prescriptions?.[exposure.prescriptionId]
-      const target = { mode: exposure.mode, sets: p?.rows.length || done.length, ...(p ? { reps: p.prefill.reps } : {}), ...(p?.prefill.durationSeconds != null ? { sec: p.prefill.durationSeconds } : {}), ...(p?.rows[0]?.load ? { weight: p.rows[0].load.value } : {}) }
+      // A cardio interval's target is minutes and speed, a hold's is seconds; an entry migrated from v1
+      // that no prescription could hold keeps the target v1 recorded for it.
+      const duration = p?.prefill.durationSeconds == null ? {}
+        : exposure.mode === 'cardio' ? { min: p.prefill.durationSeconds / 60, ...(p.prefill.speed != null ? { speed: p.prefill.speed } : {}) }
+          : { sec: p.prefill.durationSeconds }
+      const target = p || !exposure.legacyTarget
+        ? { mode: exposure.mode, sets: p?.rows.length || done.length, ...(p ? { reps: p.prefill.reps } : {}), ...duration, ...(p?.rows[0]?.load ? { weight: p.rows[0].load.value } : {}) }
+        : { ...exposure.legacyTarget, ...(exposure.mode ? { mode: exposure.mode } : {}), sets: exposure.legacyTarget.sets || done.length }
       return { d: w.d, sets: done, target, ...(exposure.routineId ? { rid: exposure.routineId } : {}) }
     }
   }

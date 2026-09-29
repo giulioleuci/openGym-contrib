@@ -1792,5 +1792,13 @@ export default {
   'Seconds added per step': 'Sekunden pro Schritt',
   'Apply RPT': 'RPT anwenden',
   'Same reps every set': 'Gleiche Wiederholungen in jedem Satz',
-  'Load only goes up if your hardest set left at least this many reps in reserve.': 'Das Gewicht steigt nur, wenn im schwersten Satz mindestens so viele Wiederholungen in Reserve blieben.'
+  'Load only goes up if your hardest set left at least this many reps in reserve.': 'Das Gewicht steigt nur, wenn im schwersten Satz mindestens so viele Wiederholungen in Reserve blieben.',
+  // --- deload: the load backs off after repeated misses ---
+  'Back off when stuck': 'Bei Stillstand zurücknehmen',
+  'Back off after repeated misses': 'Nach wiederholten Fehlversuchen zurücknehmen',
+  'Missed sessions in a row': 'Verfehlte Einheiten in Folge',
+  'Back off to (%)': 'Zurücknehmen auf (%)',
+  'after {0} · to {1}%': 'nach {0} · auf {1} %',
+  'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'Nach so vielen Einheiten unter dem Plan mit demselben Gewicht sinkt das Gewicht wieder und baut sich neu auf.',
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Zurückgenommen nach {0} Einheiten unter dem Plan: {1} → {2} {3}.'
 }

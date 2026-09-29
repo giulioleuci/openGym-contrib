@@ -1772,5 +1772,13 @@ export default {
   // --- a swap or an add during a workout changes only this session ---
   // --- how this device confirms a passkey, and where it keeps it ---
   // --- screen-reader labels on icon buttons ---,
-  'Ramp-up sets added before the work sets, so you do not have to add them by hand each session.': 'Séries de aquecimento antes das séries de trabalho, para não ter de as adicionar à mão em cada sessão.'
+  'Ramp-up sets added before the work sets, so you do not have to add them by hand each session.': 'Séries de aquecimento antes das séries de trabalho, para não ter de as adicionar à mão em cada sessão.',
+  // --- deload: the load backs off after repeated misses ---
+  'Back off when stuck': 'Reduzir a carga quando estagnar',
+  'Back off after repeated misses': 'Reduzir a carga após falhas repetidas',
+  'Missed sessions in a row': 'Sessões falhadas seguidas',
+  'Back off to (%)': 'Reduzir para (%)',
+  'after {0} · to {1}%': 'após {0} · para {1}%',
+  'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'Depois de tantas sessões abaixo do plano com a mesma carga, a carga baixa e volta a subir.',
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Carga reduzida após {0} sessões abaixo do plano: {1} → {2} {3}.'
 }

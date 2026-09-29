@@ -1772,5 +1772,13 @@ export default {
   'Seconds added per step': '단계당 추가되는 초',
   'Apply RPT': 'RPT 적용',
   'Same reps every set': '모든 세트 같은 반복',
-  'Load only goes up if your hardest set left at least this many reps in reserve.': '가장 힘든 세트에서 최소 이만큼의 반복이 남았을 때만 중량이 올라갑니다.'
+  'Load only goes up if your hardest set left at least this many reps in reserve.': '가장 힘든 세트에서 최소 이만큼의 반복이 남았을 때만 중량이 올라갑니다.',
+  // --- deload: the load backs off after repeated misses ---
+  'Back off when stuck': '정체 시 중량 낮추기',
+  'Back off after repeated misses': '연속 실패 후 중량 낮추기',
+  'Missed sessions in a row': '연속으로 놓친 세션',
+  'Back off to (%)': '낮출 비율 (%)',
+  'after {0} · to {1}%': '{0}회 후 · {1}%로',
+  'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': '같은 중량으로 계획에 못 미친 세션이 이만큼 이어지면 중량을 낮춘 뒤 다시 올립니다.',
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': '계획에 못 미친 {0}회 세션 후 중량을 낮췄습니다: {1} → {2} {3}.'
 }

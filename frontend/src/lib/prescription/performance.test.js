@@ -20,6 +20,17 @@ describe('legacyEntriesOf', () => {
     expect(bw.sets[0]).toEqual({ done: true, w: 0, r: 12 })
     expect(cardio.sets[0]).toEqual({ done: true, min: 20 })
   })
+  it('an entry migrated without a prescription reads back with the target v1 recorded for it', () => {
+    const x = { ...loggedExposure('0025', [{ r: 5, w: 60 }]), prescriptionId: null, kind: 'legacy', legacyTarget: { sets: 3, reps: 5, weight: 62.5, mode: 'reps' } }
+    expect(legacyEntriesOf({ exposures: [x] })[0].target).toEqual({ sets: 3, reps: 5, weight: 62.5, mode: 'reps' })
+    expect(legacyEntriesOf({ exposures: [{ ...x, legacyTarget: undefined }] })[0].target).toBe(null)
+  })
+  it('a cardio target reads as minutes and speed, the v1 shape', () => {
+    const rule = { ...ruleOccurrence('3220', { preset: 'manual' }).rule }
+    const p = generatePrescription({ id: 'p', now: '2026-09-24T10:00:00.000Z', trackId: 't', rule: { ...rule, parameters: { ...rule.parameters, sets: { min: 2, max: 2 }, reps: { min: 1, max: 1 }, durationSeconds: { min: 1500, max: 1500 }, speed: 9.5 } } })
+    const x = { ...loggedExposure('3220', [{ sec: 1500 }], { mode: 'cardio' }), prescriptionId: 'p' }
+    expect(legacyEntriesOf({ exposures: [x] }, { p })[0].target).toMatchObject({ mode: 'cardio', sets: 2, min: 25, speed: 9.5 })
+  })
   it('carries the exercise\'s note and its pin', () => {
     const x = loggedExposure('0025', [{ r: 5, w: 60 }])
     expect(legacyEntriesOf({ exposures: [{ ...x, performance: { ...x.performance, note: 'go narrower', notePin: true } }] })[0]).toMatchObject({ note: 'go narrower', notePin: true })

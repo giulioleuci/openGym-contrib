@@ -1809,5 +1809,13 @@ export default {
   'Seconds added per step': 'الثواني المضافة في كل خطوة',
   'Apply RPT': 'تطبيق RPT',
   'Same reps every set': 'نفس التكرارات في كل مجموعة',
-  'Load only goes up if your hardest set left at least this many reps in reserve.': 'لا يرتفع الحمل إلا إذا ترك أصعب مجموعاتك هذا العدد من التكرارات على الأقل في الاحتياط.'
+  'Load only goes up if your hardest set left at least this many reps in reserve.': 'لا يرتفع الحمل إلا إذا ترك أصعب مجموعاتك هذا العدد من التكرارات على الأقل في الاحتياط.',
+  // --- deload: the load backs off after repeated misses ---
+  'Back off when stuck': 'خفّض الحمل عند التعثر',
+  'Back off after repeated misses': 'خفّض الحمل بعد إخفاقات متكررة',
+  'Missed sessions in a row': 'جلسات فائتة متتالية',
+  'Back off to (%)': 'خفّض إلى (%)',
+  'after {0} · to {1}%': 'بعد {0} · إلى {1}%',
+  'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'بعد هذا العدد من الجلسات دون الخطة بالحمل نفسه، ينخفض الحمل ثم يرتفع من جديد.',
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'تم خفض الحمل بعد {0} جلسات دون الخطة: {1} → {2} {3}.'
 }

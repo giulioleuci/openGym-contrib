@@ -60,3 +60,49 @@ describe('prescription lifecycle (linear 20 kg -> 25 kg, +2.5)', () => {
     expect(S.progression['occ-0025']).toMatchObject({ status: 'active', planRuleRevision: 2 })
   })
 })
+
+describe('deload lifecycle (linear 60 kg, three short sessions in a row)', () => {
+  const plan = (patch = r => r) => ruleOccurrence('0025', { patch: r => patch({ ...r, target: { mode: 'none' }, completion: [], parameters: { ...r.parameters, load: { mode: 'absolute', value: 60, unit: 'kg' } } }) })
+  // A session where every work set stopped one rep short.
+  const shortSession = (S, occ, day) => {
+    const a = start(S, occ, day)
+    a.entries[0].sets.forEach(s => { s.r = 4 })
+    return { a, log: finish(S, a, day) }
+  }
+  it('the fourth session opens lighter and says why, and progression carries on from there', () => {
+    const S = profile(), occ = plan()
+    for (const day of [0, 1, 2]) shortSession(S, occ, day)
+    expect(S.progression['occ-0025']).toMatchObject({ stalls: 3, readyToDeload: true })
+    const a4 = start(S, occ, 3)
+    const p4 = S.prescriptions[a4.exposures[0].prescriptionId]
+    expect(p4.parameters.load.resolved.value).toBe(55)   // 54 kg, onto the 2.5 kg grid
+    expect(p4.provenance.deload).toMatchObject({ stalls: 3, from: 60, to: 55, method: 'epley' })
+    expect(a4.entries[0].sets.map(s => s.w)).toEqual([55, 55, 55])
+    finish(S, a4, 3)
+    expect(S.progression['occ-0025']).toMatchObject({ stalls: 0, readyToIncrement: true, readyToDeload: false })
+    expect(loadOf(S, start(S, occ, 4))).toBe(57.5)
+  })
+  it('a rule that turned the deload off keeps asking for the same load', () => {
+    const S = profile(), occ = plan(({ deload, ...r }) => r)
+    for (const day of [0, 1, 2, 3]) shortSession(S, occ, day)
+    expect(S.progression['occ-0025']).toMatchObject({ stalls: 4, readyToDeload: false })
+    expect(loadOf(S, start(S, occ, 4))).toBe(60)
+  })
+})
+
+describe('a cardio interval, start to finish', () => {
+  const cardio = ruleOccurrence('3220', {
+    preset: 'manual', patch: r => ({ ...r, parameters: { ...r.parameters, sets: { min: 1, max: 1 }, reps: { min: 1, max: 1 }, durationSeconds: { min: 1500, max: 1500 }, speed: 9.5 } })
+  })
+  it('opens as minutes and speed, and is logged and saved as cardio', () => {
+    const S = profile()
+    const a = start(S, { ...cardio, mode: 'cardio' }, 0)
+    expect(a.entries[0].target).toMatchObject({ mode: 'cardio', min: 25, speed: 9.5 })
+    expect(a.entries[0].sets).toEqual([{ setId: 'r0', done: false, min: 25, speed: 9.5 }])
+    a.entries[0].sets[0].min = 30
+    const log = finish(S, a, 0)
+    expect(log.mode).toBe('cardio')
+    expect(log.performance.sets[0].observations).toEqual([{ metric: 'duration', unit: 's', value: 1800 }, { metric: 'speed', unit: 'kmh', value: 9.5 }])
+    expect(log.actual).toMatchObject({ sets: 1, durationSeconds: 1800, speed: 9.5 })
+  })
+})

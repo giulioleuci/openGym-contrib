@@ -10,7 +10,8 @@
 // cardio, bodyweight and assisted exercises apart — a dependency this folder does not take.
 export { canonicalJSON, contentHash, deepFreeze } from './canonical.js'
 export { roundLoad, resolveExpression, resolveLoad, applyIncrement } from './load.js'
-export { PRESETS, PRESET_IDS, INCREMENT_TYPES, COMPLETION_METRICS, INCREMENTING_GATES, WENDLER_CYCLE, defaultPlanRule, needsOneRm, rptOffsets, supports, validateIntensifier, validatePlanRule, presetForPolicy, policyOfPreset } from './rules.js'
+export { PRESETS, PRESET_IDS, INCREMENT_TYPES, COMPLETION_METRICS, INCREMENTING_GATES, DELOAD_GATES, WENDLER_CYCLE, cardioParameters, defaultPlanRule, needsOneRm, rptOffsets, supports, validateIntensifier, validatePlanRule, presetForPolicy, policyOfPreset } from './rules.js'
+export { DELOAD_AFTER, DELOAD_FACTOR, DELOAD_FACTOR_MAX, DELOAD_FACTOR_MIN, defaultDeload, deloadLoad, deloadedLoad, isValidDeloadFactor, selectDeloadCandidate } from './deload.js'
 export { appendOneRm, currentOneRm, DEFAULT_FORMULA, FORMULAS, REP_CAP, estimate1RM } from './one-rm.js'
 export { generatePrescription, ruleOfPrescription } from './generate.js'
 export { planFingerprint, replayProgression, resolveProgressionContext } from './context.js'

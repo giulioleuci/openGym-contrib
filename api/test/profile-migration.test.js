@@ -73,7 +73,7 @@ test('routine entries become occurrences with the mapped preset and warm-up reci
   ];
   const { profile } = migrate(v1({ routines: [{ id: 'r1', name: 'All', ex }], workouts: [] }));
   const occ = profile.routines[0].ex;
-  assert.deepEqual(occ.map(o => o.rule.preset), ['linear', 'bodyweight_ladder', 'greyskull', 'double', 'duration', 'manual', 'manual', 'manual']);
+  assert.deepEqual(occ.map(o => o.rule.preset), ['linear', 'bodyweight_ladder', 'greyskull', 'double', 'hold_seconds', 'manual', 'manual', 'manual']);
   assert.deepEqual(occ.map(o => o.occurrenceId), ex.map((_, i) => `r1:o${i}`));
   assert.deepEqual(occ[0].rule.parameters.load, { mode: 'absolute', value: 60, unit: 'kg' });
   assert.deepEqual([occ[0].rule.parameters.sets, occ[0].rule.parameters.reps, occ[0].rule.parameters.restSeconds], [{ min: 3, max: 3 }, { min: 5, max: 5 }, 90]);
@@ -85,7 +85,10 @@ test('routine entries become occurrences with the mapped preset and warm-up reci
   assert.equal(occ[5].warmup, undefined);
   assert.deepEqual(occ[6].warmup, { mode: 'smart', count: 5 });
   assert.deepEqual(occ[7].rule.parameters.durationSeconds, { min: 1500, max: 1500 });
-  assert.deepEqual(profile.migrationAudit.unsupported.map(u => [u.occurrenceId, u.field]), [['r1:o6', 'prog'], ['r1:o7', 'speed']]);
+  // A cardio interval's speed lives on the rule, and its sheet reads the same numbers off the occurrence.
+  assert.equal(occ[7].rule.parameters.speed, 9);
+  assert.deepEqual(occ[7].cardio, { sets: 1, min: 25, speed: 9 });
+  assert.deepEqual(profile.migrationAudit.unsupported.map(u => [u.occurrenceId, u.field]), [['r1:o6', 'prog']]);
   assert.equal(occ.every(o => !('warmupSets' in o) && !('prog' in o) && !('weight' in o)), true);
 });
 
@@ -394,4 +397,113 @@ test('an exercise\'s own warm-up rest is carried onto its occurrence', () => {
   const ex = [{ id: BENCH, sets: 3, reps: 5, weight: 60, warmupSets: 2, warmupRestSec: 31 }, { id: BENCH, sets: 3, reps: 5, weight: 60 }];
   const { profile } = migrate(v1({ routines: [{ id: 'r1', name: 'Rest', ex }], workouts: [] }));
   assert.deepEqual(profile.routines[0].ex.map(o => o.warmupRestSec), [31, undefined]);
+});
+
+// ---- the deload, cardio speed, timed progression and default increments (second audit pass) ----
+
+const SQUAT = '0043', ROW = '0027';   // lower body and back: v1's bigger default step
+
+test('a v1 exercise keeps its own deload factor and v1\'s stalls-before-deload for its policy', () => {
+  const ex = [
+    { id: BENCH, sets: 3, reps: 5, weight: 60, prog: 'linear', deloadFactor: 0.8 },
+    { id: BENCH, sets: 3, reps: 5, weight: 60, prog: 'linear' },
+    { id: BENCH, sets: 3, reps: 5, weight: 60, prog: 'greyskull', deloadFactor: 0.7 },   // v1's Greyskull never read it
+    { id: BENCH, sets: 3, reps: 8, repsMin: 6, weight: 60, prog: 'double', deloadFactor: 0.85 },
+    { id: BENCH, sets: 3, reps: 5, weight: 60, prog: 'linear', deloadFactor: 0.1 },      // out of v1's 0.5-0.95: the default
+    { id: SITUP, sets: 3, sec: 45, mode: 'time', prog: 'time' },
+    { id: BENCH, sets: 3, reps: 5, weight: 60, prog: 'off', deloadFactor: 0.8 }          // nothing to back off
+  ];
+  const { profile } = migrate(v1({ routines: [{ id: 'r1', name: 'Deload', ex }], workouts: [] }));
+  assert.deepEqual(profile.routines[0].ex.map(o => o.rule.deload), [
+    { after: 3, factor: 0.8 }, { after: 3, factor: 0.9 }, { after: 1, factor: 0.9 }, { after: 3, factor: 0.85 }, { after: 3, factor: 0.9 }, { after: 3, factor: 0.9 }, undefined
+  ]);
+  assert.deepEqual(profile.migrationAudit.unsupported.map(u => [u.occurrenceId, u.field, u.value]), [['r1:o6', 'deloadFactor', 0.8]]);
+  assert.deepEqual(validateCanonicalProfile(profile), { ok: true, errors: [] });
+});
+
+test('a load step nobody chose is the body part\'s v1 default, not always 2.5', () => {
+  const ex = [{ id: SQUAT, sets: 3, reps: 5, weight: 100 }, { id: ROW, sets: 3, reps: 5, weight: 60 }, { id: BENCH, sets: 3, reps: 5, weight: 60 }, { id: SQUAT, sets: 3, reps: 5, weight: 100, inc: 2.5 }];
+  const kg = migrate(v1({ routines: [{ id: 'r1', name: 'Steps', ex }], workouts: [] })).profile.routines[0].ex.map(o => o.rule.increment.value);
+  assert.deepEqual(kg, [5, 5, 2.5, 2.5]);
+  const lb = migrate(v1({ unit: 'lb', routines: [{ id: 'r1', name: 'Steps', ex: ex.map(e => ({ ...e, weight: e.weight * 2, ...(e.inc ? { inc: 5 } : {}) })) }], workouts: [] })).profile.routines[0].ex.map(o => o.rule.increment.value);
+  assert.deepEqual(lb, [10, 10, 5, 5]);
+});
+
+test('v1\'s "Add time" is a hold that grows by its own seconds step', () => {
+  const ex = [{ id: SITUP, sets: 3, sec: 45, mode: 'time', prog: 'time' }, { id: SITUP, sets: 3, sec: 45, mode: 'time', prog: 'time', inc: 10 }, { id: SITUP, sets: 3, sec: 45, mode: 'time' }];
+  const { profile } = migrate(v1({ routines: [{ id: 'r1', name: 'Holds', ex }], workouts: [] }));
+  const [auto, own, off] = profile.routines[0].ex.map(o => o.rule);
+  assert.deepEqual([auto.preset, auto.increment, own.increment, off.preset], ['hold_seconds', { type: 'seconds', value: 5 }, { type: 'seconds', value: 10 }, 'manual']);
+  assert.deepEqual(auto.parameters.durationSeconds, { min: 45, max: 45 });
+  assert.deepEqual(validateCanonicalProfile(profile), { ok: true, errors: [] });
+});
+
+test('a timed hold resumes where v1\'s target left it: one step up after a clean session', () => {
+  const state = v1({
+    routines: [{ id: 'r1', name: 'Holds', ex: [{ id: SITUP, sets: 2, sec: 45, mode: 'time', prog: 'time', inc: 5 }] }],
+    workouts: [{ id: 'w1', d: '2026-01-05', start: Date.UTC(2026, 0, 5, 18), end: Date.UTC(2026, 0, 5, 19), routineIds: ['r1'], routineId: 'r1',
+      entries: [{ id: SITUP, rid: 'r1', target: { mode: 'time', sets: 2, sec: 60 }, sets: [{ sec: 60, w: 0, done: true }, { sec: 62, w: 0, done: true }] }] }]
+  });
+  const { profile } = migrate(state);
+  assert.deepEqual(profile.routines[0].ex[0].rule.parameters.durationSeconds, { min: 60, max: 60 });
+  assert.equal(profile.progression['r1:o0'].position, 1);
+  const x = profile.workouts[0].exposures[0];
+  const next = generatePrescription({ id: 'n', now: '2026-01-08T00:00:00.000Z', trackId: 'r1:o0', rule: profile.routines[0].ex[0].rule, state: profile.progression['r1:o0'],
+    lastPrescription: profile.prescriptions[x.prescriptionId], lastLog: { ...x, id: x.exposureId } });
+  assert.deepEqual(next.parameters.durationSeconds, { min: 65, max: 65 });
+});
+
+test('a cardio interval keeps its speed and minutes on the rule, and opens a session as cardio', () => {
+  const state = v1({
+    routines: [{ id: 'r1', name: 'Cardio', ex: [{ id: CARDIO, sets: 2, min: 25, speed: 9.5 }] }, { id: 'r2', name: 'Short', ex: [{ id: CARDIO, sets: 1, min: 10 }] }],
+    workouts: [{ id: 'w1', d: '2026-01-05', start: 1, end: 2, routineIds: ['r1'], routineId: 'r1',
+      entries: [{ id: CARDIO, rid: 'r1', target: { sets: 2, min: 30, speed: 10 }, sets: [{ min: 30, speed: 10, done: true }, { min: 30, speed: 10.5, done: true }] }] }]
+  });
+  const { profile } = migrate(state);
+  const [a] = profile.routines[0].ex;
+  const [b] = profile.routines[1].ex;
+  // The plan owns an interval's minutes and speed, as it owns reps and sets; the logged day keeps its own.
+  assert.deepEqual([a.rule.parameters.durationSeconds, a.rule.parameters.speed], [{ min: 1500, max: 1500 }, 9.5]);
+  assert.deepEqual(a.cardio, { sets: 2, min: 25, speed: 9.5 });
+  assert.equal(b.rule.parameters.speed, 8);   // a row with no speed opened at 8 in v1
+  const day = profile.prescriptions[profile.workouts[0].exposures[0].prescriptionId];
+  assert.deepEqual([day.parameters.durationSeconds, day.parameters.speed], [{ min: 1800, max: 1800 }, 10]);
+  assert.deepEqual(validateCanonicalProfile(profile), { ok: true, errors: [] });
+});
+
+test('the run of misses v1 recomputed from history is counted, so the deload comes when v1\'s would have', () => {
+  const at = (day, reps) => ({
+    id: 'w' + day, d: `2026-01-0${day}`, start: Date.UTC(2026, 0, day, 18), end: Date.UTC(2026, 0, day, 19), routineIds: ['r1'], routineId: 'r1',
+    entries: [{ id: BENCH, rid: 'r1', planned: { sets: 3, reps: 5 }, target: { sets: 3, reps: 5, weight: 100, mode: 'reps' }, sets: [row(reps, 100), row(reps, 100), row(reps, 100)] }]
+  });
+  const plan = { id: 'r1', name: 'Push', ex: [{ id: BENCH, sets: 3, reps: 5, weight: 100, prog: 'linear' }] };
+  const stalled = migrate(v1({ routines: [plan], workouts: [at(1, 5), at(2, 4), at(3, 3), at(4, 4)] })).profile;
+  assert.deepEqual(['stalls', 'stallLoad', 'readyToDeload'].map(k => stalled.progression['r1:o0'][k]), [3, 100, true]);
+  const x = stalled.workouts.at(-1).exposures[0];
+  const next = generatePrescription({ id: 'n', now: '2026-01-08T00:00:00.000Z', trackId: 'r1:o0', rule: stalled.routines[0].ex[0].rule, state: stalled.progression['r1:o0'],
+    lastPrescription: stalled.prescriptions[x.prescriptionId], lastLog: { ...x, id: x.exposureId } });
+  assert.equal(next.parameters.load.resolved.value, 90);
+  // A clean session in between, or an edit of the plan, ends the run; two misses are not yet three.
+  assert.equal(migrate(v1({ routines: [plan], workouts: [at(1, 4), at(2, 5), at(3, 4)] })).profile.progression['r1:o0'].stalls, 1);
+  assert.equal(migrate(v1({ routines: [plan], workouts: [at(1, 4), at(2, 4)] })).profile.progression['r1:o0'].readyToDeload, false);
+  const edited = at(2, 4);
+  edited.entries[0].planned = { sets: 4, reps: 5 };
+  edited.entries[0].target.sets = 4;
+  assert.equal(migrate(v1({ routines: [plan], workouts: [at(1, 4), edited, at(3, 4)] })).profile.progression['r1:o0'].stalls, 1);
+});
+
+test('what v1 prescribed for an entry no prescription could hold stays on it, verbatim', () => {
+  const state = v1({
+    routines: [],
+    workouts: [{ id: 'w1', d: '2026-01-05', start: 1, end: 2, routineId: 'gone', entries: [
+      { id: BENCH, rid: 'gone', target: { sets: 3, reps: 5, weight: 62.5, mode: 'reps', inc: 2.5, warmupRestSec: 31 }, planned: { sets: 3, reps: 5, weight: 60 }, sets: [row(5, 62.5)] },
+      { id: BENCH, target: { mode: 'reps' }, noProg: true, sets: [row(5, 40)] },
+      { id: SITUP, sets: [row(10, 0)] }
+    ] }]
+  });
+  const [gone, deload, bare] = migrate(state).profile.workouts[0].exposures;
+  assert.deepEqual(gone.legacyTarget, { sets: 3, reps: 5, weight: 62.5, mode: 'reps', inc: 2.5, warmupRestSec: 31 });
+  assert.deepEqual(gone.legacyPlanned, { sets: 3, reps: 5, weight: 60 });
+  assert.deepEqual(deload.legacyTarget, { mode: 'reps' });
+  assert.equal('legacyTarget' in bare || 'legacyPlanned' in bare, false);   // nothing was recorded, nothing is invented
 });

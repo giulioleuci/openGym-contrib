@@ -1772,5 +1772,13 @@ export default {
   'Seconds added per step': 'Секунд добавляется за шаг',
   'Apply RPT': 'Применить RPT',
   'Same reps every set': 'Одинаковые повторения в каждом подходе',
-  'Load only goes up if your hardest set left at least this many reps in reserve.': 'Нагрузка растёт, только если в самом тяжёлом подходе осталось в запасе не меньше стольких повторений.'
+  'Load only goes up if your hardest set left at least this many reps in reserve.': 'Нагрузка растёт, только если в самом тяжёлом подходе осталось в запасе не меньше стольких повторений.',
+  // --- deload: the load backs off after repeated misses ---
+  'Back off when stuck': 'Снижать нагрузку при застое',
+  'Back off after repeated misses': 'Снижать после повторных неудач',
+  'Missed sessions in a row': 'Неудачных тренировок подряд',
+  'Back off to (%)': 'Снизить до (%)',
+  'after {0} · to {1}%': 'после {0} · до {1}%',
+  'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'Если столько тренировок подряд с тем же весом не дотянули до плана, вес снижается и снова растёт.',
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Вес снижен после {0} тренировок ниже плана: {1} → {2} {3}.'
 }

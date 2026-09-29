@@ -1,14 +1,15 @@
 // Session finalization: one completed log against its prescription in, the track's next
 // ProgressionState out. The completion list is a flat AND — every condition must pass.
 import { roundLoad } from './load.js'
-import { INCREMENTING_GATES, PRESETS } from './rules.js'
+import { DELOAD_GATES, INCREMENTING_GATES, PRESETS } from './rules.js'
 
 export function initialProgressionState(trackId) {
   return {
     trackId, status: 'active', cyclesCompleted: 0,
     lastPrescriptionId: null, lastCompletedLogId: null, lastActual: null,
     terminalTarget: null, completedAt: null,
-    planRuleRevision: null, readyToIncrement: false, position: 0, trainingMax: null
+    planRuleRevision: null, readyToIncrement: false, position: 0, trainingMax: null,
+    stalls: 0, stallLoad: null, readyToDeload: false
   }
 }
 
@@ -63,14 +64,28 @@ export function advanceProgression({ state, prescription: p, log, now }) {
   const base = state || initialProgressionState(p.trackId)
   const next = { ...base, planRuleRevision: p.planRuleRevision, lastPrescriptionId: p.id, lastCompletedLogId: log.id, lastActual: log.actual }
   // Completed freezes automation only — the log above is still recorded. An edited rule reopens.
-  if (base.status === 'completed' && base.planRuleRevision === p.planRuleRevision) return { ...next, readyToIncrement: false }
+  if (base.status === 'completed' && base.planRuleRevision === p.planRuleRevision) return { ...next, readyToIncrement: false, readyToDeload: false }
   Object.assign(next, { status: 'active', terminalTarget: null, completedAt: null })
 
   const gate = PRESETS[p.preset].gate
   const earned = gate ? GATES[gate](p, log.actual) && effortOk(p, log.actual) : false
   next.readyToIncrement = earned && INCREMENTING_GATES.includes(gate)
   if (gate === 'rung' && earned && p.position < (p.special.rungs?.length ?? 0) - 1) next.position = p.position + 1
-  if (gate === 'seconds' && earned) next.position = p.position + 1
+  // The prescription's own position, not the old state's: a deloaded hold was generated further back.
+  if (gate === 'seconds') next.position = earned ? p.position + 1 : p.position
+  // A stall is a session short of even the minimum prescribed (v1's "not ok"): a clean session that
+  // has not yet reached the top of a range is a hold, not a stall, and ends the streak. The streak
+  // is also broken by a change of load — the lighter weight after a deload is not judged by the
+  // misses that earned it.
+  if (DELOAD_GATES.includes(gate)) {
+    const missed = !hit(p, log.actual)
+    // What the run is at: the load lifted, or a hold's window — v1 kept counting misses across a
+    // hold's back-off and deloaded it again straight away; a new window is a new run here.
+    const at = gate === 'seconds' ? p.parameters.durationSeconds?.min ?? null : log.actual.load?.value ?? p.parameters.load.resolved?.value ?? null
+    next.stalls = missed ? (base.stalls > 0 && base.stallLoad === at ? base.stalls + 1 : 1) : 0
+    next.stallLoad = missed ? at : null
+    next.readyToDeload = missed && !!p.deload && next.stalls >= p.deload.after
+  }
   if (p.preset === 'five_three_one') {
     next.trainingMax = p.trainingMax ? { ...p.trainingMax } : null
     next.position = p.position + 1
@@ -82,7 +97,7 @@ export function advanceProgression({ state, prescription: p, log, now }) {
   }
 
   if (p.completion.length && p.completion.every(c => PASSES[c.metric](p, log.actual, next, c))) {
-    Object.assign(next, { status: 'completed', terminalTarget: p.target.resolved ? { ...p.target.resolved } : null, completedAt: now, readyToIncrement: false })
+    Object.assign(next, { status: 'completed', terminalTarget: p.target.resolved ? { ...p.target.resolved } : null, completedAt: now, readyToIncrement: false, readyToDeload: false })
   }
   return next
 }

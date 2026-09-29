@@ -1772,5 +1772,13 @@ export default {
   'Seconds added per step': 'Segundos añadidos por paso',
   'Apply RPT': 'Aplicar RPT',
   'Same reps every set': 'Mismas repeticiones en cada serie',
-  'Load only goes up if your hardest set left at least this many reps in reserve.': 'La carga solo sube si tu serie más dura dejó al menos estas repeticiones en reserva.'
+  'Load only goes up if your hardest set left at least this many reps in reserve.': 'La carga solo sube si tu serie más dura dejó al menos estas repeticiones en reserva.',
+  // --- deload: the load backs off after repeated misses ---
+  'Back off when stuck': 'Bajar la carga si te estancas',
+  'Back off after repeated misses': 'Bajar la carga tras fallos repetidos',
+  'Missed sessions in a row': 'Sesiones fallidas seguidas',
+  'Back off to (%)': 'Bajar al (%)',
+  'after {0} · to {1}%': 'tras {0} · al {1}%',
+  'After this many sessions short of the plan at the same load, the load goes back down and builds up again.': 'Tras tantas sesiones por debajo del plan con la misma carga, la carga baja y vuelve a subir.',
+  'Backed off after {0} sessions short of the plan: {1} → {2} {3}.': 'Carga reducida tras {0} sesiones por debajo del plan: {1} → {2} {3}.'
 }

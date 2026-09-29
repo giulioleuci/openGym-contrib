@@ -62,7 +62,7 @@ function entryOf(x, prescriptions) {
     ...(x.routineId ? { rid: x.routineId } : {}),
     ...(x.excludedFromProgression ? { noProg: true } : {}),
     ...(x.sg ? { sg: x.sg } : {}),
-    target: { ...(x.mode ? { mode: x.mode } : {}), ...(p ? targetFor(p) : {}), ...(x.side ? { side: true } : {}), ...(x.bodyweight != null ? { bodyweight: x.bodyweight } : {}), ...(x.intensifier ? { intensifier: x.intensifier } : {}) },
+    target: { ...(x.mode ? { mode: x.mode } : {}), ...(p ? targetFor(p, x.mode) : {}), ...(x.side ? { side: true } : {}), ...(x.bodyweight != null ? { bodyweight: x.bodyweight } : {}), ...(x.intensifier ? { intensifier: x.intensifier } : {}) },
     ...(p ? { planned: plannedOf(p) } : {}),
     ...(x.performance?.note ? { note: x.performance.note } : {}),
     ...(x.performance?.notePin ? { notePin: true } : {}),

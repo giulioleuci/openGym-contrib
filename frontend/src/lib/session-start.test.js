@@ -115,6 +115,16 @@ describe('warm-up inputs', () => {
     const id = Object.keys(EXIDX).find(k => isAssisted(k))
     expect(run(occ(id, { mode: 'smart', count: 3 })).warmupRows).toBeUndefined()
   })
+  it('an exposure says how it is logged: the occurrence\'s mode, else the catalogue\'s, and a bare duration is a hold', () => {
+    const exposure = ex => buildSessionExposures({ workouts: [], prescriptions: {}, progression: {}, oneRepMaxes: {} }, { id: 'rt', ex: [ex] }, { now: 0, newId: s => s })[0]
+    const cardio = { ...occ('3220'), mode: 'cardio' }
+    expect(exposure(cardio).mode).toBe('cardio')
+    expect(exposure({ ...occ('3220') }).mode).toBe('cardio')   // the catalogue knows it is cardio
+    expect(exposure(occ('0025')).mode).toBe('reps')
+    const hold = occ('0001')
+    hold.rule.parameters.durationSeconds = { min: 30, max: 30 }
+    expect(exposure(hold).mode).toBe('time')
+  })
   it('the occurrence\'s own ramp rest reaches its exposure, and only when it has one', () => {
     const exposure = ex => buildSessionExposures({ workouts: [], prescriptions: {}, progression: {}, oneRepMaxes: {} }, { id: 'rt', ex: [ex] }, { now: 0, newId: s => s })[0]
     expect(exposure({ ...occ('0025'), warmupRestSec: 31 }).warmupRestSec).toBe(31)

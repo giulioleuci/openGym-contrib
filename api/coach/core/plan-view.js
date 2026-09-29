@@ -17,10 +17,11 @@ export function coachExOf(occ, ex = null) {
     o.reps = p.reps.min;
     if (p.reps.min !== p.reps.max) { o.repsMin = p.reps.min; o.repsMax = p.reps.max; }
   } else if (p.durationSeconds) {
-    if (mode === 'cardio') o.min = p.durationSeconds.min / 60; else o.sec = p.durationSeconds.min;
+    if (mode === 'cardio') { o.min = p.durationSeconds.min / 60; if (p.speed) o.speed = p.speed; } else o.sec = p.durationSeconds.min;
   }
   if (p.load.mode === 'absolute' && p.load.value > 0) o.weight = p.load.value;
-  if (r.increment.type === 'absolute' && r.increment.value > 0) o.inc = r.increment.value;
+  // v1's `inc` is a load step, or the seconds a timed hold grows by.
+  if ((r.increment.type === 'absolute' || r.increment.type === 'seconds') && r.increment.value > 0) o.inc = r.increment.value;
   o.prog = policy ?? 'off';
   if (policy == null) o.preset = r.preset;
   if (occ.sg) o.sg = occ.sg;
@@ -52,8 +53,9 @@ export function ruleFromView(rule, view, { unit, bodyweight = false }) {
     const seconds = view.mode === 'cardio' ? (view.min > 0 ? view.min * 60 : 0) : (view.sec > 0 ? view.sec : 0);
     // coachExOf reads a seconds range as its minimum: an unchanged `sec` keeps the range.
     if (seconds && seconds !== p.durationSeconds?.min) Object.assign(p, { reps: fixed(1), durationSeconds: fixed(seconds) });
+    if (view.mode === 'cardio' && view.speed > 0 && p.durationSeconds) p.speed = view.speed;
   }
   if (view.weight > 0) p.load = { mode: 'absolute', value: view.weight, unit };
-  if (view.inc > 0) out.increment = { type: 'absolute', value: view.inc, unit };
+  if (view.inc > 0) out.increment = preset === 'hold_seconds' ? { type: 'seconds', value: view.inc } : { type: 'absolute', value: view.inc, unit };
   return out;
 }

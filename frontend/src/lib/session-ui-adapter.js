@@ -6,11 +6,16 @@ import { isSideSet, isWarmupRow, makeSideSet, syncSideAggregate } from './workou
 import { applyIntensifierPlan, modeOf } from './history.js'
 
 const weightOf = (p, i) => p.prefill.load?.value ?? p.rows[i]?.load?.value ?? null
+// What a cardio row with no speed of its own opened at in v1 (history.js buildSets).
+const CARDIO_SPEED = 8
 
-export const targetFor = p => ({
+// A cardio interval logs minutes and speed (the workout screen's columns), a hold logs seconds.
+const cardioTarget = p => ({ mode: 'cardio', min: p.prefill.durationSeconds / 60, speed: p.prefill.speed ?? CARDIO_SPEED })
+
+export const targetFor = (p, mode) => ({
   sets: p.rows.length,
   reps: p.prefill.reps,
-  ...(p.parameters.durationSeconds ? { mode: 'time', sec: p.prefill.durationSeconds } : {}),
+  ...(p.parameters.durationSeconds ? (mode === 'cardio' ? cardioTarget(p) : { mode: 'time', sec: p.prefill.durationSeconds }) : {}),
   ...(weightOf(p, 0) != null ? { weight: weightOf(p, 0) } : {}),
   restSec: p.parameters.restSeconds
 })
@@ -28,7 +33,11 @@ export function plannedOf(p) {
 // 5/3/1 weeks and RPT pyramids give each row its own reps; everything else shares the prefill.
 const perRowReps = p => p.preset === 'five_three_one' || !!p.special?.offsets?.some(o => o.reps)
 
-const rowFor = (p, i) => {
+const rowFor = (p, i, mode) => {
+  if (mode === 'cardio' && p.parameters.durationSeconds) {
+    const { min, speed } = cardioTarget(p)
+    return { setId: 'r' + i, done: false, min, speed }
+  }
   const w = weightOf(p, i)
   const reps = perRowReps(p) ? p.rows[i].reps.min : p.prefill.reps
   return {
@@ -47,7 +56,7 @@ const warmupRowFor = ({ load, reps }) => ({ w: load.value, r: reps, done: false,
 // and leaves the ramp to the engine's own warm-up rows when there are any.
 function intensified(p, exposure) {
   // A unilateral exercise logs each work row per limb (issue #60), reps split evenly.
-  const work = p.rows.map((_, i) => (exposure.side ? makeSideSet(rowFor(p, i)) : rowFor(p, i)))
+  const work = p.rows.map((_, i) => (exposure.side ? makeSideSet(rowFor(p, i, exposure.mode)) : rowFor(p, i, exposure.mode)))
   if (!exposure.intensifier) return work
   const out = applyIntensifierPlan(work, { intensifier: exposure.intensifier, reps: p.prefill.reps })
   if (exposure.intensifier.type !== 'restpause') return out
@@ -64,7 +73,7 @@ export function entriesForExposures(exposures, prescriptions) {
       ...(exposure.routineId ? { rid: exposure.routineId } : {}),
       ...(exposure.excludedFromProgression ? { noProg: true } : {}),
       ...(exposure.sg ? { sg: exposure.sg } : {}),
-      target: { ...targetFor(p), ...(exposure.side ? { side: true } : {}), ...(exposure.warmupRestSec > 0 ? { warmupRestSec: exposure.warmupRestSec } : {}), ...(exposure.bodyweight != null ? { bodyweight: exposure.bodyweight } : {}), ...(exposure.intensifier ? { intensifier: exposure.intensifier } : {}) },
+      target: { ...targetFor(p, exposure.mode), ...(exposure.side ? { side: true } : {}), ...(exposure.warmupRestSec > 0 ? { warmupRestSec: exposure.warmupRestSec } : {}), ...(exposure.bodyweight != null ? { bodyweight: exposure.bodyweight } : {}), ...(exposure.intensifier ? { intensifier: exposure.intensifier } : {}) },
       planned: plannedOf(p),
       ...(p.prefill.carried ? { carried: true } : {}),
       sets: [...(p.warmupRows || []).map(warmupRowFor), ...intensified(p, exposure)]
@@ -80,7 +89,9 @@ export const actualOfRow = (row, unit) => ({
   row: rowIndexOf(row) ?? Infinity,
   reps: row.sec != null ? null : row.r ?? null,
   load: row.w > 0 ? { value: row.w, unit } : null,
-  durationSeconds: row.sec ?? null,
+  // A cardio row is minutes, a hold's is seconds: the engine reads both as a duration.
+  durationSeconds: row.sec ?? (row.min != null ? row.min * 60 : null),
+  speed: row.speed ?? null,
   rir: row.rir ?? null,
   rpeEntered: row.rpe ?? null
 })
