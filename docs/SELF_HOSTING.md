@@ -566,10 +566,15 @@ Android/iOS app writes `gym_state_v1.pre-engine-v1.json` next to its own data fi
 JSON backup exported before the upgrade asks the same question before anything is imported.
 
 The conversion maps each exercise's old progression setting onto its closest rule (linear,
-Greyskull LP, double progression, time; a linear bodyweight exercise becomes the bodyweight
-ladder, anything else becomes manual) and a warm-up count onto a smart ramp of that length.
-Plan files shared from an older version are refused rather than imported empty — re-export
+Greyskull LP, double progression, "Add time" as the timed-hold rule; a linear bodyweight
+exercise becomes the bodyweight ladder, anything else becomes manual) and a warm-up count onto a
+smart ramp of that length. Deload settings, cardio speed and assistance-machine direction carry
+over. Plan files shared from an older version are refused rather than imported empty — re-export
 them from an upgraded instance.
+
+The full field-by-field description of both data models, the conversion of history and of a
+workout in progress, and the cases that need care before upgrading is in
+[MIGRATION_TO_ENGINE_NOTE.md](MIGRATION_TO_ENGINE_NOTE.md).
 
 ## Passkeys fail even though `RP_ID` looks right
 
